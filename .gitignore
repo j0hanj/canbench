@@ -1,0 +1,14 @@
+# Build output
+build/
+cmake-build-*/
+out/
+
+# Downloaded CAN trace samples (see test/corpus/README.md)
+data/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+compile_commands.json
