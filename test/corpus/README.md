@@ -7,3 +7,9 @@ small CAN traces for testing. keep them tiny and say where they came from.
   drop a note here with the source
 
 nothing from a paid tool or a specific car's proprietary database.
+
+## files
+
+- `drive.log` - hand-typed, candump `.log` format
+  (`(secs.usecs) iface 123#DEADBEEF`). couple of std + ext ids, a remote
+  frame, a padded OBD-II style request. for the log reader once it exists.
