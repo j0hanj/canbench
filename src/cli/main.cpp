@@ -1,19 +1,24 @@
-// canbench cli. only `decode` does anything real yet.
+// canbench cli. `decode` does one frame, `dump` reads a candump .log.
 
+#include <cstdio>
 #include <iostream>
+#include <set>
+#include <string>
 #include <string_view>
 #include <vector>
 
 #include "frame/frame.hpp"
+#include "log/log.hpp"
 
 namespace {
 
 int usage(std::ostream& os) {
   os << "usage: canbench <cmd> [args]\n"
         "  decode <frame>   parse one frame like 123#DEADBEEF and print it\n"
+        "  dump <file.log>  read a candump .log and list every frame\n"
         "  -v / --version\n"
         "  -h / --help\n"
-        "later: dump, signals, sim, fault, check\n";
+        "later: signals, sim, fault, check\n";
   return 0;
 }
 
@@ -27,6 +32,33 @@ int decode(std::string_view text) {
   std::cout << canbench::describe(*f) << '\n'
             << "crc15   0x" << std::hex << canbench::crc15(in) << std::dec << '\n'
             << "on-wire " << canbench::to_string(canbench::bit_timeline(*f)) << '\n';
+  return 0;
+}
+
+int dump(std::string_view path) {
+  auto log = canbench::read_log(std::string(path));
+  if (!log) {
+    std::cerr << "canbench: can't open '" << path << "'\n";
+    return 1;
+  }
+
+  double t0 = log->start_ts();
+  std::set<std::uint32_t> ids;
+  for (const auto& e : log->entries) {
+    ids.insert(e.frame.id);
+    char rel[16];
+    std::snprintf(rel, sizeof(rel), "%9.6f", e.ts - t0);
+    std::cout << rel << "  " << e.bus << "  " << canbench::describe(e.frame)
+              << '\n';
+  }
+
+  std::cout << "-- " << log->entries.size() << " frames, "
+            << ids.size() << " unique ids, " << log->duration() << "s span";
+  if (!log->errors.empty()) std::cout << ", " << log->errors.size() << " bad lines";
+  std::cout << '\n';
+  for (const auto& err : log->errors)
+    std::cerr << "  line " << err.line << ": " << err.why << " -> " << err.text
+              << '\n';
   return 0;
 }
 
@@ -51,6 +83,13 @@ int main(int argc, char** argv) {
       return 2;
     }
     return decode(args[1]);
+  }
+  if (cmd == "dump") {
+    if (args.size() != 2) {
+      std::cerr << "canbench: dump wants one .log file\n";
+      return 2;
+    }
+    return dump(args[1]);
   }
 
   std::cerr << "canbench: dunno what '" << cmd << "' is\n";

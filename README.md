@@ -23,20 +23,23 @@ it to:
 
 ## right now
 
-only the frame stuff works. you can do:
+frame decode + reading a candump log. you can do:
 
 ```
 canbench decode 123#DEADBEEF
+canbench dump some.log
 ```
 
-and it prints the fields, the crc, and the raw bit sequence. that's it so far.
+`decode` prints the fields, the crc, and the raw bit sequence for one frame.
+`dump` reads a whole `candump -l` file and lists every frame with its time
+offset, bus, and bytes, plus a count of anything that didn't parse.
 
 ## todo
 
 - [x] frame struct + parse the `123#DEADBEEF` shorthand
 - [x] crc-15 (poly 0x4599)
 - [x] bit stuffing + full on-wire bit layout
-- [ ] read an actual candump .log file
+- [x] read an actual candump .log file
 - [ ] .dbc parser -> named signals
 - [ ] virtual bus w/ arbitration
 - [ ] error counters + bus-off

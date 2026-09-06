@@ -23,8 +23,26 @@ haven't run the catch2 tests, no cmake on my laptop yet (`brew install cmake`).
 just did `clang++ -std=c++20` on frame.cpp + main.cpp to make sure it builds and
 `decode` prints something sane.
 
+## day 2
+
+candump `.log` reader - `src/log/`.
+
+- `parse_log()` takes the whole file as text, splits each line into
+  `(ts) bus frame`, reuses `parse_short()` for the frame part
+- blank lines + `#` comments skipped. bad lines don't abort - they go in
+  `LogFile::errors` with a line number and a reason, parser keeps going. felt
+  better than bailing on the first typo in a 10k-line capture
+- timestamp parse: strip the parens, `strtod`, then check it consumed the
+  whole string so `(nope)` and `(1.0x)` get rejected instead of silently
+  becoming 1.0
+- `canbench dump file.log` prints each frame with its offset from the first
+  timestamp, the bus, and `describe()` output, then a summary line
+- the span print shows `0.0999999s` - float noise, don't care for now
+
+tested against `test/corpus/drive.log`. catch2 tests in `log_test.cpp`, still
+haven't run them (no cmake).
+
 ## next
 
-- read a real candump `.log` (`(1650000000.123456) can0 123#DEADBEEF`)
 - start the dbc parser so i can get rpm/speed out instead of raw bytes
 - then the fake bus, which is where fault injection + error counters live

@@ -14,6 +14,7 @@ add_compile_options(-Wall -Wextra)
 # core lib, grows as i add stuff
 add_library(canbench_core STATIC
   src/frame/frame.cpp
+  src/log/log.cpp
 )
 target_include_directories(canbench_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
