@@ -23,16 +23,21 @@ it to:
 
 ## right now
 
-frame decode + reading a candump log. you can do:
+frame decode, reading a candump log, and pulling named signals out with a
+`.dbc`. you can do:
 
 ```
 canbench decode 123#DEADBEEF
 canbench dump some.log
+canbench signals some.log some.dbc
 ```
 
 `decode` prints the fields, the crc, and the raw bit sequence for one frame.
 `dump` reads a whole `candump -l` file and lists every frame with its time
 offset, bus, and bytes, plus a count of anything that didn't parse.
+`signals` matches each logged frame against the `.dbc` and prints the decoded
+values - rpm, coolant temp, wheel speeds - with units. handles both Intel and
+Motorola bit layouts and signed signals.
 
 ## todo
 
@@ -40,7 +45,7 @@ offset, bus, and bytes, plus a count of anything that didn't parse.
 - [x] crc-15 (poly 0x4599)
 - [x] bit stuffing + full on-wire bit layout
 - [x] read an actual candump .log file
-- [ ] .dbc parser -> named signals
+- [x] .dbc parser -> named signals
 - [ ] virtual bus w/ arbitration
 - [ ] error counters + bus-off
 - [ ] fault injection

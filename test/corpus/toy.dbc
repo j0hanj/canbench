@@ -1,0 +1,20 @@
+VERSION ""
+
+BO_ 291 EngineData: 4 ECU
+ SG_ EngineSpeed : 0|16@1+ (0.25,0) [0|16383.75] "rpm" Dash
+ SG_ CoolantTemp : 16|8@1+ (1,-40) [-40|215] "degC" Dash
+ SG_ Throttle : 24|8@1+ (0.4,0) [0|102] "%" Dash
+
+BO_ 945 Transmission: 1 ECU
+ SG_ Gear : 0|4@1+ (1,0) [0|8] "" Dash
+
+BO_ 1110 WheelSpeeds: 8 ABS
+ SG_ FrontLeft : 0|16@1+ (0.01,0) [0|655.35] "km/h" Dash
+ SG_ FrontRight : 16|16@1+ (0.01,0) [0|655.35] "km/h" Dash
+ SG_ RearLeft : 32|16@1+ (0.01,0) [0|655.35] "km/h" Dash
+ SG_ RearRight : 48|16@1+ (0.01,0) [0|655.35] "km/h" Dash
+
+BO_ 2015 ObdRequest: 8 Tester
+ SG_ Length : 0|8@1+ (1,0) [0|8] "" ECU
+ SG_ Service : 8|8@1+ (1,0) [0|255] "" ECU
+ SG_ Pid : 16|8@1+ (1,0) [0|255] "" ECU

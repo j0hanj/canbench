@@ -13,3 +13,6 @@ nothing from a paid tool or a specific car's proprietary database.
 - `drive.log` - hand-typed, candump `.log` format
   (`(secs.usecs) iface 123#DEADBEEF`). couple of std + ext ids, a remote
   frame, a padded OBD-II style request. for the log reader once it exists.
+- `toy.dbc` - hand-written, made up. engine/transmission/wheel-speed/obd
+  messages keyed to the ids in `drive.log` so `signals` has something to
+  decode. numbers aren't from any real car.

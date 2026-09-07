@@ -10,6 +10,7 @@ add_executable(canbench_tests
   unit/smoke_test.cpp
   unit/frame_test.cpp
   unit/log_test.cpp
+  unit/dbc_test.cpp
 )
 target_link_libraries(canbench_tests PRIVATE canbench_core Catch2::Catch2WithMain)
 

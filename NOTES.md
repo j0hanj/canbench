@@ -42,7 +42,36 @@ candump `.log` reader - `src/log/`.
 tested against `test/corpus/drive.log`. catch2 tests in `log_test.cpp`, still
 haven't run them (no cmake).
 
+## day 3
+
+.dbc parser + signal decode - `src/dbc/`. this is the fun one, raw bytes
+finally turn into "2500 rpm".
+
+only reading `BO_` (message) and `SG_` (signal) lines, skipping everything
+else - `BU_`, `CM_`, `VAL_`, attributes. `parse_bo` is a one-line sscanf,
+`parse_sg` needed a hand-rolled front (the name, and an optional `m0` mux
+token before the `:`) then sscanf for the
+`start|len@order sign (factor,offset) [min|max] "unit"` tail.
+
+signal bit extraction, the part i knew would bite:
+- Intel / little-endian (`@1`): start bit is the LSB, bits just climb through
+  the bytes. easy - `raw |= bit << i`.
+- Motorola / big-endian (`@0`): start bit is the *MSB*, and the walk
+  sawtooths. you count the bit index down to 0 inside a byte, then jump +15
+  to land on bit 7 of the next byte. build `raw` MSB-first. took a couple of
+  paper diagrams. test: start bit 7, len 16 over `[0x12,0x34]` should give
+  `0x1234`.
+- signed: if the top bit of the field is set, subtract `1 << length`.
+- dbc marks 29-bit ids by setting bit 31, so mask that off and remember it.
+
+`canbench signals drive.log toy.dbc` walks the log, looks up each id, prints
+the decoded signals with units + a "no message in the dbc" count. wrote
+`toy.dbc` by hand with ids that line up with `drive.log`.
+
+catch2 tests in `dbc_test.cpp` - Intel/Motorola/signed/scaling + a small
+parse. still no cmake locally, built with clang++ and eyeballed the output.
+
 ## next
 
-- start the dbc parser so i can get rpm/speed out instead of raw bytes
-- then the fake bus, which is where fault injection + error counters live
+- virtual bus: a few fake nodes taking turns, arbitration by id
+- then error counters + bus-off, which is where fault injection plugs in
