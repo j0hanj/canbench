@@ -140,39 +140,80 @@ std::uint16_t crc15(const std::vector<Bit>& bits) {
   return crc & 0x7FFF;
 }
 
-std::vector<Bit> bit_timeline(const Frame& f) {
-  // SOF..data plus the 15 crc bits - stuffing runs over this whole span
-  std::vector<Bit> span = crc_input_bits(f);
-  push_bits(span, crc15(crc_input_bits(f)), 15);
+namespace {
 
-  std::vector<Bit> wire;
+// SOF..data..crc as (bit, field) pairs, before stuffing. mirrors
+// crc_input_bits() but keeps track of which field each bit came from.
+std::vector<WireBit> tagged_span(const Frame& f) {
+  std::vector<WireBit> s;
+  auto put = [&](Bit b, Field field) { s.push_back({b, field, false}); };
+  auto put_n = [&](std::uint32_t v, int n, Field field) {
+    for (int i = n - 1; i >= 0; --i) put(bit_of((v >> i) & 1u), field);
+  };
+
+  put(Bit::kDominant, Field::kSof);
+
+  if (!f.extended) {
+    put_n(f.id & kStdIdMax, 11, Field::kId);
+    put(bit_of(f.rtr), Field::kControl);
+    put(Bit::kDominant, Field::kControl);   // IDE = 0
+    put(Bit::kDominant, Field::kControl);   // r0
+  } else {
+    put_n((f.id >> 18) & kStdIdMax, 11, Field::kId);
+    put(Bit::kRecessive, Field::kControl);  // SRR
+    put(Bit::kRecessive, Field::kControl);  // IDE = 1
+    put_n(f.id & 0x3FFFF, 18, Field::kId);
+    put(bit_of(f.rtr), Field::kControl);
+    put(Bit::kDominant, Field::kControl);   // r1
+    put(Bit::kDominant, Field::kControl);   // r0
+  }
+
+  put_n(f.dlc & 0xF, 4, Field::kDlc);
+  for (int i = 0; i < f.data_len(); ++i) put_n(f.data[i], 8, Field::kData);
+  put_n(crc15(crc_input_bits(f)), 15, Field::kCrc);
+  return s;
+}
+
+}  // namespace
+
+std::vector<WireBit> annotated_timeline(const Frame& f) {
+  std::vector<WireBit> span = tagged_span(f);
+
+  std::vector<WireBit> wire;
   wire.reserve(span.size() + 16);
   Bit last = Bit::kRecessive;  // nothing before SOF, so no run going
   int run = 0;
-  for (Bit b : span) {
-    if (b == last) {
+  for (const WireBit& wb : span) {
+    if (wb.level == last) {
       ++run;
     } else {
-      last = b;
+      last = wb.level;
       run = 1;
     }
-    wire.push_back(b);
+    wire.push_back(wb);
     if (run == kStuffAfter) {
-      // drop in the opposite bit. it counts as the start of a new run.
-      last = (b == Bit::kDominant) ? Bit::kRecessive : Bit::kDominant;
+      // drop in the opposite bit. same field as the run it broke up, and it
+      // counts as the start of a new run.
+      last = (wb.level == Bit::kDominant) ? Bit::kRecessive : Bit::kDominant;
       run = 1;
-      wire.push_back(last);
+      wire.push_back({last, wb.field, true});
     }
   }
 
   // the tail isn't stuffed. crc delim, ack slot+delim, 7 eof, 3 intermission.
   // ack stays recessive here since there's no other node to pull it down.
-  wire.push_back(Bit::kRecessive);
-  wire.push_back(Bit::kRecessive);
-  wire.push_back(Bit::kRecessive);
-  for (int i = 0; i < 7; ++i) wire.push_back(Bit::kRecessive);
-  for (int i = 0; i < 3; ++i) wire.push_back(Bit::kRecessive);
+  wire.push_back({Bit::kRecessive, Field::kCrcDelim, false});
+  wire.push_back({Bit::kRecessive, Field::kAck, false});
+  wire.push_back({Bit::kRecessive, Field::kAckDelim, false});
+  for (int i = 0; i < 7; ++i) wire.push_back({Bit::kRecessive, Field::kEof, false});
+  for (int i = 0; i < 3; ++i) wire.push_back({Bit::kRecessive, Field::kIfs, false});
   return wire;
+}
+
+std::vector<Bit> bit_timeline(const Frame& f) {
+  std::vector<Bit> out;
+  for (const WireBit& wb : annotated_timeline(f)) out.push_back(wb.level);
+  return out;
 }
 
 std::string to_string(const std::vector<Bit>& bits) {

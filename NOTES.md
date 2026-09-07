@@ -71,6 +71,33 @@ the decoded signals with units + a "no message in the dbc" count. wrote
 catch2 tests in `dbc_test.cpp` - Intel/Motorola/signed/scaling + a small
 parse. still no cmake locally, built with clang++ and eyeballed the output.
 
+## day 4
+
+waveform view - `src/wave/`. wanted something i could actually look at instead
+of a string of 0s and 1s.
+
+first had to teach the frame layer to hand back more than a flat bit list.
+added `annotated_timeline()` - same bits as `bit_timeline()` but each one
+tagged with its field (sof / id / control / dlc / data / crc / delims / ack /
+eof / ifs) and a `stuffed` flag. rewrote `bit_timeline()` as a thin wrapper
+over it so the old tests didn't move.
+
+`wave()` draws it: a field ruler, then two rows of box characters for the
+high/low rails (idle bus is recessive so it starts high, SOF is the first
+drop), then a row of `^` under the stuff bits. edges are just
+`rising -> ┌┘`, `falling -> ┐└`. one col per bit.
+
+`canbench wave 7DF#0201050000000000` is a good one - all those zero bytes
+force 14 stuff bits and you can see them march across.
+
+control bits (SRR/IDE/RTR/r1/r0) all get lumped as "ctl" in the ruler, nobody
+reads them one at a time. the ruler labels can crowd each other on tight
+frames but it's close enough.
+
+catch2 tests in `wave_test.cpp` - annotated vs flat timeline match, sof/ifs at
+the ends, stuff bits only in sof..crc, and the drawing has the rows + one
+caret per stuff bit. still building with clang++, no cmake.
+
 ## next
 
 - virtual bus: a few fake nodes taking turns, arbitration by id

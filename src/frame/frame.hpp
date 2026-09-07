@@ -47,6 +47,23 @@ std::vector<Bit> crc_input_bits(const Frame& f);
 // CAN's 15-bit crc, poly 0x4599, run MSB first.
 std::uint16_t crc15(const std::vector<Bit>& bits);
 
+// which part of the frame a bit belongs to. control = SRR/IDE/RTR/r1/r0,
+// lumped together since they're all single bits nobody looks at individually.
+enum class Field : std::uint8_t {
+  kSof, kId, kControl, kDlc, kData, kCrc,
+  kCrcDelim, kAck, kAckDelim, kEof, kIfs
+};
+
+struct WireBit {
+  Bit level;
+  Field field;
+  bool stuffed = false;  // true if this is an inserted stuff bit
+};
+
+// same sequence as bit_timeline() but each bit tagged with its field and
+// whether the stuffing rule inserted it. this is what the waveform view uses.
+std::vector<WireBit> annotated_timeline(const Frame& f);
+
 // the whole frame on the wire: SOF through end-of-frame, with stuff bits
 // added in across the SOF..crc part. dominant=0, recessive=1.
 std::vector<Bit> bit_timeline(const Frame& f);

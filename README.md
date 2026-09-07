@@ -30,6 +30,7 @@ frame decode, reading a candump log, and pulling named signals out with a
 canbench decode 123#DEADBEEF
 canbench dump some.log
 canbench signals some.log some.dbc
+canbench wave 123#DEADBEEF
 ```
 
 `decode` prints the fields, the crc, and the raw bit sequence for one frame.
@@ -38,6 +39,17 @@ offset, bus, and bytes, plus a count of anything that didn't parse.
 `signals` matches each logged frame against the `.dbc` and prints the decoded
 values - rpm, coolant temp, wheel speeds - with units. handles both Intel and
 Motorola bit layouts and signed signals.
+`wave` draws the frame the way it goes out on the wire - a square wave with the
+fields marked and every stuff bit flagged:
+
+```
+id=0x123 std data dlc=4 [DE AD BE EF]   81 bits on the wire, 2 stuffed
+  field  SID........ ctlDLC DATA............................ CRC............  A EOF... IFS
+    rec  ┐  ┌┐ ┌┐  ┌─┐   ┌┐ ┌─┐┌───┐┌┐┌┐┌─┐┌─┐┌────┐ ┌──┐┌────┐  ┌──┐ ┌─┐┌┐┌──────────────
+    dom  └──┘└─┘└──┘ └───┘└─┘ └┘   └┘└┘└┘ └┘ └┘    └─┘  └┘    └──┘  └─┘ └┘└┘
+  stuff                                            ^          ^
+  (high = recessive/1, low = dominant/0, ^ = stuff bit)
+```
 
 ## todo
 
@@ -50,7 +62,7 @@ Motorola bit layouts and signed signals.
 - [ ] error counters + bus-off
 - [ ] fault injection
 - [ ] spec check w/ pass/fail
-- [ ] some kind of waveform view
+- [x] some kind of waveform view (ascii for now)
 
 ## build
 

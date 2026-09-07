@@ -10,6 +10,7 @@
 #include "dbc/dbc.hpp"
 #include "frame/frame.hpp"
 #include "log/log.hpp"
+#include "wave/wave.hpp"
 
 namespace {
 
@@ -18,9 +19,10 @@ int usage(std::ostream& os) {
         "  decode <frame>   parse one frame like 123#DEADBEEF and print it\n"
         "  dump <file.log>  read a candump .log and list every frame\n"
         "  signals <file.log> <file.dbc>   decode named signals from a log\n"
+        "  wave <frame>     draw one frame as an ascii square wave\n"
         "  -v / --version\n"
         "  -h / --help\n"
-        "later: signals, sim, fault, check\n";
+        "later: sim, fault, check\n";
   return 0;
 }
 
@@ -101,6 +103,16 @@ int signals(std::string_view log_path, std::string_view dbc_path) {
   return 0;
 }
 
+int wave(std::string_view text) {
+  auto f = canbench::parse_short(text);
+  if (!f) {
+    std::cerr << "canbench: can't parse '" << text << "'\n";
+    return 1;
+  }
+  std::cout << canbench::wave(*f) << '\n';
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -136,6 +148,13 @@ int main(int argc, char** argv) {
       return 2;
     }
     return signals(args[1], args[2]);
+  }
+  if (cmd == "wave") {
+    if (args.size() != 2) {
+      std::cerr << "canbench: wave wants one frame arg\n";
+      return 2;
+    }
+    return wave(args[1]);
   }
 
   std::cerr << "canbench: dunno what '" << cmd << "' is\n";
