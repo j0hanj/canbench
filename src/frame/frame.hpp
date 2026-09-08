@@ -44,6 +44,18 @@ std::string describe(const Frame& f);
 // the bits the crc covers: SOF + id/control + data, no stuffing yet.
 std::vector<Bit> crc_input_bits(const Frame& f);
 
+// the arbitration field on the wire: the id bits plus RTR, and for extended
+// frames the SRR + IDE + the low 18 id bits in between. this is the stretch
+// nodes watch bit-by-bit to work out who gets the bus.
+std::vector<Bit> arbitration_bits(const Frame& f);
+
+// if a and b started sending at the same time, who wins? dominant beats
+// recessive, so it's whoever's arbitration bits compare lower.
+//   <0  a wins    >0  b wins    0  same priority (identical arbitration field)
+// note a standard frame beats an extended one with the same 11-bit base, and
+// a data frame beats the matching remote frame.
+int arbitration_cmp(const Frame& a, const Frame& b);
+
 // CAN's 15-bit crc, poly 0x4599, run MSB first.
 std::uint16_t crc15(const std::vector<Bit>& bits);
 

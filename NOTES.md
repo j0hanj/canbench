@@ -98,7 +98,22 @@ catch2 tests in `wave_test.cpp` - annotated vs flat timeline match, sof/ifs at
 the ends, stuff bits only in sof..crc, and the drawing has the rows + one
 caret per stuff bit. still building with clang++, no cmake.
 
+## day 5
+
+small one - `arbitration_bits()` + `arbitration_cmp()` in the frame layer, so
+the virtual bus has something to call when two nodes talk over each other.
+
+arbitration is just the id bits (MSB first) sent out while everyone watches
+the wire. dominant (0) beats recessive (1), so lower id wins. `arbitration_cmp`
+walks the two bit fields and returns at the first mismatch.
+
+the fiddly cases, now covered by tests:
+- data vs remote, same id: data wins because RTR is dominant on a data frame
+- std vs extended with the same 11-bit base: the std frame's field is shorter
+  and it wins every contested bit (its IDE is dominant where the ext frame's
+  SRR/IDE are recessive), so shorter-and-equal = std takes it
+
 ## next
 
-- virtual bus: a few fake nodes taking turns, arbitration by id
+- virtual bus: a few fake nodes taking turns, using arbitration_cmp
 - then error counters + bus-off, which is where fault injection plugs in

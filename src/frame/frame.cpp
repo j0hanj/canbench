@@ -129,6 +129,36 @@ std::vector<Bit> crc_input_bits(const Frame& f) {
   return b;
 }
 
+std::vector<Bit> arbitration_bits(const Frame& f) {
+  std::vector<Bit> b;
+  if (!f.extended) {
+    push_bits(b, f.id & kStdIdMax, 11);
+    b.push_back(bit_of(f.rtr));    // RTR
+    b.push_back(Bit::kDominant);   // IDE = 0, still contested against extended
+  } else {
+    push_bits(b, (f.id >> 18) & kStdIdMax, 11);
+    b.push_back(Bit::kRecessive);  // SRR - sits where a std frame's RTR is
+    b.push_back(Bit::kRecessive);  // IDE = 1
+    push_bits(b, f.id & 0x3FFFF, 18);
+    b.push_back(bit_of(f.rtr));    // RTR
+  }
+  return b;
+}
+
+int arbitration_cmp(const Frame& a, const Frame& b) {
+  auto ba = arbitration_bits(a);
+  auto bb = arbitration_bits(b);
+  std::size_t n = std::min(ba.size(), bb.size());
+  for (std::size_t i = 0; i < n; ++i) {
+    if (ba[i] != bb[i])
+      return (ba[i] == Bit::kDominant) ? -1 : 1;  // dominant wins
+  }
+  // equal all the way through the shorter field - that's the std frame, and it
+  // has already won every contested bit, so it takes the bus.
+  if (ba.size() != bb.size()) return ba.size() < bb.size() ? -1 : 1;
+  return 0;
+}
+
 std::uint16_t crc15(const std::vector<Bit>& bits) {
   // textbook shift-register crc. one bit at a time.
   std::uint16_t crc = 0;

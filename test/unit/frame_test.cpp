@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+using canbench::arbitration_cmp;
 using canbench::Bit;
 using canbench::bit_timeline;
 using canbench::crc15;
@@ -87,6 +88,35 @@ TEST_CASE("crc15 matches the known check value", "[frame]") {
 
 TEST_CASE("all-dominant crc is zero", "[frame]") {
   CHECK(crc15(std::vector<Bit>(20, Bit::kDominant)) == 0);
+}
+
+TEST_CASE("lower id wins the bus", "[frame]") {
+  auto lo = parse_short("100#00");
+  auto hi = parse_short("200#00");
+  REQUIRE(lo);
+  REQUIRE(hi);
+  CHECK(arbitration_cmp(*lo, *hi) < 0);
+  CHECK(arbitration_cmp(*hi, *lo) > 0);
+  CHECK(arbitration_cmp(*lo, *lo) == 0);
+}
+
+TEST_CASE("data frame beats the matching remote frame", "[frame]") {
+  auto data = parse_short("123#00");
+  auto remote = parse_short("123#R");
+  REQUIRE(data);
+  REQUIRE(remote);
+  CHECK(arbitration_cmp(*data, *remote) < 0);  // RTR dominant on the data frame
+}
+
+TEST_CASE("standard frame beats an extended frame with the same base", "[frame]") {
+  // std id 0x123, extended id with the same top 11 bits (0x123 << 18)
+  auto std_f = parse_short("123#00");
+  auto ext_f = parse_short("048C0000#00");  // 0x048C0000 >> 18 == 0x123
+  REQUIRE(std_f);
+  REQUIRE(ext_f);
+  REQUIRE(ext_f->extended);
+  CHECK((ext_f->id >> 18) == 0x123u);
+  CHECK(arbitration_cmp(*std_f, *ext_f) < 0);
 }
 
 TEST_CASE("stuffing breaks up long runs", "[frame]") {
