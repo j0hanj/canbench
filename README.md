@@ -31,6 +31,7 @@ canbench decode 123#DEADBEEF
 canbench dump some.log
 canbench signals some.log some.dbc
 canbench wave 123#DEADBEEF
+canbench arb 200#R 100#00 7DF#0201
 ```
 
 `decode` prints the fields, the crc, and the raw bit sequence for one frame.
@@ -39,6 +40,9 @@ offset, bus, and bytes, plus a count of anything that didn't parse.
 `signals` matches each logged frame against the `.dbc` and prints the decoded
 values - rpm, coolant temp, wheel speeds - with units. handles both Intel and
 Motorola bit layouts and signed signals.
+`arb` takes a handful of frames and sorts them the way the bus would when they
+all start at once - lowest id first, data before remote. it's the arbitration
+rule on its own, ahead of the actual virtual bus.
 `wave` draws the frame the way it goes out on the wire - a square wave with the
 fields marked and every stuff bit flagged:
 

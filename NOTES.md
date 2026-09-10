@@ -113,6 +113,13 @@ the fiddly cases, now covered by tests:
   and it wins every contested bit (its IDE is dominant where the ext frame's
   SRR/IDE are recessive), so shorter-and-equal = std takes it
 
+## day 6
+
+`canbench arb frame frame ...` - stable_sort the frames through
+`arbitration_cmp` and print them in the order the bus would pick. tiny wrapper
+but it makes yesterday's compare function something i can actually see, and
+it's a stand-in until the real bus loop exists.
+
 ## next
 
 - virtual bus: a few fake nodes taking turns, using arbitration_cmp

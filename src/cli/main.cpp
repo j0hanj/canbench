@@ -1,5 +1,6 @@
 // canbench cli. `decode` does one frame, `dump` reads a candump .log.
 
+#include <algorithm>
 #include <cstdio>
 #include <iostream>
 #include <set>
@@ -20,6 +21,7 @@ int usage(std::ostream& os) {
         "  dump <file.log>  read a candump .log and list every frame\n"
         "  signals <file.log> <file.dbc>   decode named signals from a log\n"
         "  wave <frame>     draw one frame as an ascii square wave\n"
+        "  arb <frame>...   sort frames into bus arbitration order\n"
         "  -v / --version\n"
         "  -h / --help\n"
         "later: sim, fault, check\n";
@@ -113,6 +115,29 @@ int wave(std::string_view text) {
   return 0;
 }
 
+int arb(const std::vector<std::string_view>& texts) {
+  std::vector<canbench::Frame> frames;
+  for (auto t : texts) {
+    auto f = canbench::parse_short(t);
+    if (!f) {
+      std::cerr << "canbench: can't parse '" << t << "'\n";
+      return 1;
+    }
+    frames.push_back(*f);
+  }
+
+  // stable so frames with the same arbitration field keep the order given
+  std::stable_sort(frames.begin(), frames.end(),
+                   [](const canbench::Frame& a, const canbench::Frame& b) {
+                     return canbench::arbitration_cmp(a, b) < 0;
+                   });
+
+  std::cout << "arbitration order (first one gets the bus):\n";
+  for (std::size_t i = 0; i < frames.size(); ++i)
+    std::cout << "  " << (i + 1) << "  " << canbench::describe(frames[i]) << '\n';
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -155,6 +180,13 @@ int main(int argc, char** argv) {
       return 2;
     }
     return wave(args[1]);
+  }
+  if (cmd == "arb") {
+    if (args.size() < 3) {
+      std::cerr << "canbench: arb wants at least two frames\n";
+      return 2;
+    }
+    return arb({args.begin() + 1, args.end()});
   }
 
   std::cerr << "canbench: dunno what '" << cmd << "' is\n";
