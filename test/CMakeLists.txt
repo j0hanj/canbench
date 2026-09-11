@@ -12,6 +12,7 @@ add_executable(canbench_tests
   unit/log_test.cpp
   unit/dbc_test.cpp
   unit/wave_test.cpp
+  unit/bus_test.cpp
 )
 target_link_libraries(canbench_tests PRIVATE canbench_core Catch2::Catch2WithMain)
 

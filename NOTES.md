@@ -120,7 +120,30 @@ the fiddly cases, now covered by tests:
 but it makes yesterday's compare function something i can actually see, and
 it's a stand-in until the real bus loop exists.
 
+## day 7
+
+virtual bus - `src/bus/`. finally something that isn't just one frame at a
+time.
+
+`Node` is a name + a queue of frames. `run_bus()` runs rounds: every node
+with a frame left contends with its front-of-queue frame, `arbitration_cmp`
+picks the winner, that frame comes off and gets logged, repeat till every
+queue's empty. no bit timing, no actual collisions on the wire - just "given
+these nodes want to send these frames, in what order do they actually get
+out." that's honestly most of what i wanted from arbitration anyway.
+
+ties go to whoever's first in the node list, same as real silicon just wins
+an arbitrary race. and a node can't cut in front of its own earlier frames
+even if a later one would technically win - it's still a queue.
+
+`canbench sim ecu:100#DEADBEEF,500#00 abs:200#R,100#01 dash:7DF#0201` -
+`name:frame,frame,...` per node, comma separated, space between nodes.
+
+catch2 tests in `bus_test.cpp`: cross-node ordering, own-queue ordering stays
+put, and the empty cases. still haven't run them for real, no cmake.
+
 ## next
 
-- virtual bus: a few fake nodes taking turns, using arbitration_cmp
-- then error counters + bus-off, which is where fault injection plugs in
+- error counters + bus-off - a node racks up faults and eventually goes
+  quiet, which is where fault injection actually gets interesting
+- fault injection: flip a bit, kill the ack, corrupt a crc mid-transmission

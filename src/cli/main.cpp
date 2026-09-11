@@ -3,11 +3,13 @@
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "bus/bus.hpp"
 #include "dbc/dbc.hpp"
 #include "frame/frame.hpp"
 #include "log/log.hpp"
@@ -22,6 +24,7 @@ int usage(std::ostream& os) {
         "  signals <file.log> <file.dbc>   decode named signals from a log\n"
         "  wave <frame>     draw one frame as an ascii square wave\n"
         "  arb <frame>...   sort frames into bus arbitration order\n"
+        "  sim <node>:<frame>[,<frame>...] ...   run a fake bus, print send order\n"
         "  -v / --version\n"
         "  -h / --help\n"
         "later: sim, fault, check\n";
@@ -138,6 +141,44 @@ int arb(const std::vector<std::string_view>& texts) {
   return 0;
 }
 
+// "ecu:100#DEADBEEF,200#00" -> a Node named "ecu" with those two frames
+std::optional<canbench::Node> parse_node(std::string_view text) {
+  auto colon = text.find(':');
+  if (colon == std::string_view::npos) return std::nullopt;
+
+  canbench::Node n;
+  n.name = std::string(text.substr(0, colon));
+  std::string_view rest = text.substr(colon + 1);
+  while (!rest.empty()) {
+    auto comma = rest.find(',');
+    std::string_view tok = rest.substr(0, comma);
+    auto f = canbench::parse_short(tok);
+    if (!f) return std::nullopt;
+    n.queue.push_back(*f);
+    rest = (comma == std::string_view::npos) ? std::string_view{} : rest.substr(comma + 1);
+  }
+  return n;
+}
+
+int sim(const std::vector<std::string_view>& texts) {
+  std::vector<canbench::Node> nodes;
+  for (auto t : texts) {
+    auto n = parse_node(t);
+    if (!n) {
+      std::cerr << "canbench: bad node '" << t << "', want name:frame[,frame...]\n";
+      return 1;
+    }
+    nodes.push_back(std::move(*n));
+  }
+
+  auto log = canbench::run_bus(std::move(nodes));
+  std::cout << "bus order (" << log.size() << " frames sent):\n";
+  for (std::size_t i = 0; i < log.size(); ++i)
+    std::cout << "  " << (i + 1) << "  " << log[i].node << "  "
+              << canbench::describe(log[i].frame) << '\n';
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -187,6 +228,13 @@ int main(int argc, char** argv) {
       return 2;
     }
     return arb({args.begin() + 1, args.end()});
+  }
+  if (cmd == "sim") {
+    if (args.size() < 2) {
+      std::cerr << "canbench: sim wants at least one name:frame[,frame...]\n";
+      return 2;
+    }
+    return sim({args.begin() + 1, args.end()});
   }
 
   std::cerr << "canbench: dunno what '" << cmd << "' is\n";

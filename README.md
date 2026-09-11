@@ -32,6 +32,7 @@ canbench dump some.log
 canbench signals some.log some.dbc
 canbench wave 123#DEADBEEF
 canbench arb 200#R 100#00 7DF#0201
+canbench sim ecu:100#DEADBEEF,500#00 abs:200#R,100#01 dash:7DF#0201
 ```
 
 `decode` prints the fields, the crc, and the raw bit sequence for one frame.
@@ -43,6 +44,11 @@ Motorola bit layouts and signed signals.
 `arb` takes a handful of frames and sorts them the way the bus would when they
 all start at once - lowest id first, data before remote. it's the arbitration
 rule on its own, ahead of the actual virtual bus.
+`sim` is that virtual bus - give it a few nodes, each with its own queue of
+frames (`name:frame,frame,...`), and it runs arbitration round by round until
+every queue is empty, printing the order everything actually went out in. a
+node's own frames still go out in the order it queued them - winning
+arbitration doesn't let a node cut in front of its earlier frames.
 `wave` draws the frame the way it goes out on the wire - a square wave with the
 fields marked and every stuff bit flagged:
 
@@ -62,7 +68,7 @@ id=0x123 std data dlc=4 [DE AD BE EF]   81 bits on the wire, 2 stuffed
 - [x] bit stuffing + full on-wire bit layout
 - [x] read an actual candump .log file
 - [x] .dbc parser -> named signals
-- [ ] virtual bus w/ arbitration
+- [x] virtual bus w/ arbitration (round-based, no bit timing yet)
 - [ ] error counters + bus-off
 - [ ] fault injection
 - [ ] spec check w/ pass/fail
