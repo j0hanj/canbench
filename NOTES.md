@@ -142,8 +142,42 @@ even if a later one would technically win - it's still a queue.
 catch2 tests in `bus_test.cpp`: cross-node ordering, own-queue ordering stays
 put, and the empty cases. still haven't run them for real, no cmake.
 
+## day 8
+
+fault injection + error counters + bus-off, all in one go since they're
+really one feature - `src/bus/errors.hpp` plus hooking it into `run_bus()`.
+this is the one i was most looking forward to.
+
+`errors.hpp` is CAN's fault confinement rules, simplified: every node has a
+TEC and REC. good tx = tec-1, bad tx = tec+8, good rx = rec-1, bad rx =
+rec+1. tec/rec >= 128 = error-passive, tec > 255 = bus-off and you're done
+transmitting for good. real ISO 11898-1 has more nuance (different error
+types add different amounts, rec has a weird "don't decrement past 119 once
+it's been over 127" carve-out) but this gets the shape right and that's what
+i wanted to see.
+
+fault injection is just a bool on a queued frame now - `QueuedFrame.faulty`.
+mark one and `run_bus` treats it as corrupted: the sender eats a transmit
+error, every other node still on the bus eats a receive error (that's the
+real behavior - on a real bus everyone sees a bad crc and flags it, which is
+what bumps the sender's tec in the first place). a node that goes bus-off
+stops contending immediately, and its remaining queue just never sends -
+no recovery, that's future work if i ever care.
+
+cli: `!` after a frame in `sim` marks it faulty -
+`ecu:100#DEADBEEF!,200#00` sends one bad frame then one good one. fed it 34
+faulted frames from one node and watched it cross into PASSIVE at the 16th
+(tec 128) and BUS-OFF at the 32nd (tec 256), then its last 2 frames just
+never went out. exactly the thing i wanted this whole project to be able to
+show.
+
+catch2 tests: `errors_test.cpp` for the counter math and state thresholds in
+isolation, `bus_test.cpp` extended with a full passive->bus-off run and a
+check that a bus-off node's leftover frames get reported as never-sent.
+still haven't run any of it through ctest, no cmake on this laptop.
+
 ## next
 
-- error counters + bus-off - a node racks up faults and eventually goes
-  quiet, which is where fault injection actually gets interesting
-- fault injection: flip a bit, kill the ack, corrupt a crc mid-transmission
+- spec check: point it at a log + a little rules file, get a pass/fail
+- eventually: real bus-off recovery (128x11 recessive bits), actual
+  bit-level corruption instead of a flag on the frame

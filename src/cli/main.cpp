@@ -24,10 +24,11 @@ int usage(std::ostream& os) {
         "  signals <file.log> <file.dbc>   decode named signals from a log\n"
         "  wave <frame>     draw one frame as an ascii square wave\n"
         "  arb <frame>...   sort frames into bus arbitration order\n"
-        "  sim <node>:<frame>[,<frame>...] ...   run a fake bus, print send order\n"
+        "  sim <node>:<frame>[!][,<frame>[!]...] ...   run a fake bus with error\n"
+        "      counters + bus-off. '!' after a frame injects a fault on it\n"
         "  -v / --version\n"
         "  -h / --help\n"
-        "later: sim, fault, check\n";
+        "later: spec check w/ pass/fail\n";
   return 0;
 }
 
@@ -141,7 +142,8 @@ int arb(const std::vector<std::string_view>& texts) {
   return 0;
 }
 
-// "ecu:100#DEADBEEF,200#00" -> a Node named "ecu" with those two frames
+// "ecu:100#DEADBEEF,200#00!" -> a Node named "ecu" with those two frames,
+// the second one flagged as faulty (trailing '!' = gets corrupted on the wire)
 std::optional<canbench::Node> parse_node(std::string_view text) {
   auto colon = text.find(':');
   if (colon == std::string_view::npos) return std::nullopt;
@@ -152,12 +154,27 @@ std::optional<canbench::Node> parse_node(std::string_view text) {
   while (!rest.empty()) {
     auto comma = rest.find(',');
     std::string_view tok = rest.substr(0, comma);
+    canbench::QueuedFrame qf;
+    if (!tok.empty() && tok.back() == '!') {
+      qf.faulty = true;
+      tok.remove_suffix(1);
+    }
     auto f = canbench::parse_short(tok);
     if (!f) return std::nullopt;
-    n.queue.push_back(*f);
+    qf.frame = *f;
+    n.queue.push_back(qf);
     rest = (comma == std::string_view::npos) ? std::string_view{} : rest.substr(comma + 1);
   }
   return n;
+}
+
+const char* state_name(canbench::BusState s) {
+  switch (s) {
+    case canbench::BusState::kActive: return "active";
+    case canbench::BusState::kPassive: return "PASSIVE";
+    case canbench::BusState::kOff: return "BUS-OFF";
+  }
+  return "?";
 }
 
 int sim(const std::vector<std::string_view>& texts) {
@@ -165,17 +182,34 @@ int sim(const std::vector<std::string_view>& texts) {
   for (auto t : texts) {
     auto n = parse_node(t);
     if (!n) {
-      std::cerr << "canbench: bad node '" << t << "', want name:frame[,frame...]\n";
+      std::cerr << "canbench: bad node '" << t
+                << "', want name:frame[!][,frame[!]...] ('!' = inject a fault)\n";
       return 1;
     }
     nodes.push_back(std::move(*n));
   }
 
-  auto log = canbench::run_bus(std::move(nodes));
-  std::cout << "bus order (" << log.size() << " frames sent):\n";
-  for (std::size_t i = 0; i < log.size(); ++i)
-    std::cout << "  " << (i + 1) << "  " << log[i].node << "  "
-              << canbench::describe(log[i].frame) << '\n';
+  auto result = canbench::run_bus(std::move(nodes));
+  std::cout << "bus order (" << result.log.size() << " frames sent):\n";
+  for (std::size_t i = 0; i < result.log.size(); ++i) {
+    const auto& t = result.log[i];
+    char line[128];
+    std::snprintf(line, sizeof(line), "  %2zu  %-6s %-42s tec=%-4d rec=%-4d %s",
+                  i + 1, t.node.c_str(), canbench::describe(t.frame).c_str(),
+                  t.counters.tec, t.counters.rec, state_name(t.state));
+    std::cout << line;
+    if (t.faulty) std::cout << "  [FAULT]";
+    std::cout << '\n';
+  }
+
+  std::cout << "--\n";
+  for (const auto& n : result.nodes) {
+    std::cout << "  " << n.name << "  sent " << n.sent << "/" << n.queued
+              << "  tec=" << n.counters.tec << " rec=" << n.counters.rec << "  "
+              << state_name(n.state);
+    if (n.sent < n.queued) std::cout << "  (" << (n.queued - n.sent) << " never sent)";
+    std::cout << '\n';
+  }
   return 0;
 }
 

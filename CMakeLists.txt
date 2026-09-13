@@ -18,6 +18,7 @@ add_library(canbench_core STATIC
   src/dbc/dbc.cpp
   src/wave/wave.cpp
   src/bus/bus.cpp
+  src/bus/errors.cpp
 )
 target_include_directories(canbench_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 

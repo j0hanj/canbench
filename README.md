@@ -49,6 +49,30 @@ frames (`name:frame,frame,...`), and it runs arbitration round by round until
 every queue is empty, printing the order everything actually went out in. a
 node's own frames still go out in the order it queued them - winning
 arbitration doesn't let a node cut in front of its earlier frames.
+
+it also does fault injection and error counters now: tag any frame with a
+trailing `!` and it's treated as corrupted on the wire. the sender takes a
+transmit error (its TEC goes up by 8), everyone else still on the bus takes a
+receive error (REC up by 1). enough of those in a row and a node crosses into
+error-passive, then bus-off, at which point it stops sending and whatever's
+left in its queue never goes out - the same fault confinement rule that keeps
+one flaky module from jamming a real car's bus:
+
+```
+$ canbench sim ecu:100#DEADBEEF!,...(34 total)... abs:200#00,200#00,200#00
+bus order (35 frames sent):
+   1  ecu    id=0x100 std data dlc=4 [DE AD BE EF]      tec=8    rec=0    active  [FAULT]
+     ...
+  16  ecu    id=0x100 std data dlc=4 [DE AD BE EF]      tec=128  rec=0    PASSIVE  [FAULT]
+     ...
+  32  ecu    id=0x100 std data dlc=4 [DE AD BE EF]      tec=256  rec=0    BUS-OFF  [FAULT]
+  33  abs    id=0x200 std data dlc=1 [00]               tec=0    rec=32   active
+  34  abs    id=0x200 std data dlc=1 [00]               tec=0    rec=32   active
+  35  abs    id=0x200 std data dlc=1 [00]               tec=0    rec=32   active
+--
+  ecu  sent 32/34  tec=256 rec=0  BUS-OFF  (2 never sent)
+  abs  sent 3/3  tec=0 rec=32  active
+```
 `wave` draws the frame the way it goes out on the wire - a square wave with the
 fields marked and every stuff bit flagged:
 
@@ -69,8 +93,8 @@ id=0x123 std data dlc=4 [DE AD BE EF]   81 bits on the wire, 2 stuffed
 - [x] read an actual candump .log file
 - [x] .dbc parser -> named signals
 - [x] virtual bus w/ arbitration (round-based, no bit timing yet)
-- [ ] error counters + bus-off
-- [ ] fault injection
+- [x] error counters + bus-off
+- [x] fault injection (flip a flag on a frame for now, not a real bit-level corrupt)
 - [ ] spec check w/ pass/fail
 - [x] some kind of waveform view (ascii for now)
 
