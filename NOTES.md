@@ -176,6 +176,27 @@ isolation, `bus_test.cpp` extended with a full passive->bus-off run and a
 check that a bus-off node's leftover frames get reported as never-sent.
 still haven't run any of it through ctest, no cmake on this laptop.
 
+## day 9
+
+`brew install cmake` finally. ran ctest for real for the first time since day
+1 - all these "haven't run it, no cmake" notes were covering for actually
+just eyeballing clang++ output this whole time. 44 tests, 2 failed:
+
+- `parse_short("800#00")` was supposed to get rejected (0x800 doesn't fit in
+  11 bits) but it wasn't. the bug: `f.extended = id_text.size() > 3 || *id >
+  kStdIdMax` was auto-promoting an out-of-range 3-digit id to extended
+  instead of just rejecting it, so "800" quietly became a 29-bit frame with
+  id 0x800 instead of an error. extended should only ever come from digit
+  count, not from the value overflowing. one-line fix.
+- `log.duration() == 0.1` failed with `0.0999999046 == 0.1` - subtracting two
+  ~1.65e9 doubles eats enough precision that exact equality doesn't survive.
+  not a bug in the code, a bug in the test - swapped it for `WithinAbs`.
+
+both fixed, all 44 green now. glad i finally checked - the id-overflow one
+was a real correctness bug that's been sitting there since day 1 and none of
+my clang++ eyeball checks would've ever caught it since i never happened to
+type an out-of-range 3-digit id.
+
 ## next
 
 - spec check: point it at a log + a little rules file, get a pass/fail

@@ -58,8 +58,11 @@ std::optional<Frame> parse_short(std::string_view text) {
 
   Frame f;
   f.id = *id;
-  // socketcan treats a >3-digit id as extended. also anything that won't fit in 11 bits.
-  f.extended = id_text.size() > 3 || *id > kStdIdMax;
+  // socketcan treats a >3-digit id as extended - purely by digit count. a
+  // 3-digit id that's out of 11-bit range (e.g. "800") is just invalid, not
+  // an automatic promotion to extended - caught the bug when i finally got
+  // cmake running and the "800#00 should be rejected" test actually failed.
+  f.extended = id_text.size() > 3;
   if (f.id > (f.extended ? kExtIdMax : kStdIdMax)) return std::nullopt;
 
   if (!rest.empty() && (rest.front() == 'R' || rest.front() == 'r')) {

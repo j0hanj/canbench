@@ -1,10 +1,12 @@
 #include "log/log.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <string_view>
 
 using canbench::parse_log;
+using Catch::Matchers::WithinAbs;
 
 namespace {
 
@@ -35,7 +37,10 @@ TEST_CASE("reads every line of a clean log", "[log]") {
 TEST_CASE("relative time helpers", "[log]") {
   auto log = parse_log(kSample);
   CHECK(log.start_ts() == 1650000000.0);
-  CHECK(log.duration() == 0.1);
+  // exact == fails here - subtracting two ~1.65e9 doubles loses enough
+  // precision that 0.1 comes back as 0.0999999046. found this the hard way
+  // once ctest actually ran it instead of me eyeballing the cli output.
+  CHECK_THAT(log.duration(), WithinAbs(0.1, 1e-6));
 }
 
 TEST_CASE("blank lines and # comments are skipped", "[log]") {
