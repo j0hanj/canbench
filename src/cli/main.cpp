@@ -13,6 +13,7 @@
 #include "dbc/dbc.hpp"
 #include "frame/frame.hpp"
 #include "log/log.hpp"
+#include "spec/spec.hpp"
 #include "wave/wave.hpp"
 
 namespace {
@@ -26,9 +27,9 @@ int usage(std::ostream& os) {
         "  arb <frame>...   sort frames into bus arbitration order\n"
         "  sim <node>:<frame>[!][,<frame>[!]...] ...   run a fake bus with error\n"
         "      counters + bus-off. '!' after a frame injects a fault on it\n"
+        "  check <file.log> <file.spec> [file.dbc]   run a log against a spec\n"
         "  -v / --version\n"
-        "  -h / --help\n"
-        "later: spec check w/ pass/fail\n";
+        "  -h / --help\n";
   return 0;
 }
 
@@ -213,6 +214,39 @@ int sim(const std::vector<std::string_view>& texts) {
   return 0;
 }
 
+int check(std::string_view log_path, std::string_view spec_path, std::string_view dbc_path) {
+  auto log = canbench::read_log(std::string(log_path));
+  if (!log) {
+    std::cerr << "canbench: can't open '" << log_path << "'\n";
+    return 2;
+  }
+  auto spec = canbench::read_spec(std::string(spec_path));
+  if (!spec) {
+    std::cerr << "canbench: can't open '" << spec_path << "'\n";
+    return 2;
+  }
+  for (const auto& err : spec->errors) std::cerr << "canbench: " << err << '\n';
+
+  std::optional<canbench::Dbc> dbc;
+  if (!dbc_path.empty()) {
+    dbc = canbench::read_dbc(std::string(dbc_path));
+    if (!dbc) {
+      std::cerr << "canbench: can't open '" << dbc_path << "'\n";
+      return 2;
+    }
+  }
+
+  auto results = canbench::check_spec(*log, dbc ? &*dbc : nullptr, spec->rules);
+  int failed = 0;
+  for (const auto& r : results) {
+    std::cout << (r.passed ? "PASS" : "FAIL") << "  " << r.detail << '\n';
+    if (!r.passed) ++failed;
+  }
+
+  std::cout << "-- " << (results.size() - failed) << "/" << results.size() << " rules passed\n";
+  return failed == 0 ? 0 : 1;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -269,6 +303,13 @@ int main(int argc, char** argv) {
       return 2;
     }
     return sim({args.begin() + 1, args.end()});
+  }
+  if (cmd == "check") {
+    if (args.size() != 3 && args.size() != 4) {
+      std::cerr << "canbench: check wants a .log and a .spec, and optionally a .dbc\n";
+      return 2;
+    }
+    return check(args[1], args[2], args.size() == 4 ? args[3] : std::string_view{});
   }
 
   std::cerr << "canbench: dunno what '" << cmd << "' is\n";

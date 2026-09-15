@@ -33,6 +33,7 @@ canbench signals some.log some.dbc
 canbench wave 123#DEADBEEF
 canbench arb 200#R 100#00 7DF#0201
 canbench sim ecu:100#DEADBEEF,500#00 abs:200#R,100#01 dash:7DF#0201
+canbench check drive.log drive.spec toy.dbc
 ```
 
 `decode` prints the fields, the crc, and the raw bit sequence for one frame.
@@ -73,6 +74,23 @@ bus order (35 frames sent):
   ecu  sent 32/34  tec=256 rec=0  BUS-OFF  (2 never sent)
   abs  sent 3/3  tec=0 rec=32  active
 ```
+`check` is the last item on the original list - point it at a log and a spec
+file, get a pass/fail per rule and an overall exit code (0 if everything
+passed, 1 if anything failed, so it's usable in a script). the spec language
+is tiny: `present <id>`, `absent <id>`, `range <signal> <min> <max>` (the
+range rules need a `.dbc` to know how to decode the signal). one rule per
+line, `#` comments:
+
+```
+$ canbench check drive.log toy.spec toy.dbc
+PASS  id 0x123 seen 3 times
+PASS  id 0x3B1 seen 2 times
+PASS  id 0x999 seen 0 times
+PASS  EngineSpeed stayed in [0, 16383.8] over 3 frames
+PASS  CoolantTemp stayed in [-40, 215] over 3 frames
+PASS  Gear stayed in [0, 8] over 2 frames
+-- 6/6 rules passed
+```
 `wave` draws the frame the way it goes out on the wire - a square wave with the
 fields marked and every stuff bit flagged:
 
@@ -95,7 +113,7 @@ id=0x123 std data dlc=4 [DE AD BE EF]   81 bits on the wire, 2 stuffed
 - [x] virtual bus w/ arbitration (round-based, no bit timing yet)
 - [x] error counters + bus-off
 - [x] fault injection (flip a flag on a frame for now, not a real bit-level corrupt)
-- [ ] spec check w/ pass/fail
+- [x] spec check w/ pass/fail
 - [x] some kind of waveform view (ascii for now)
 
 ## build

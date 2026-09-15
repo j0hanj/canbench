@@ -197,8 +197,34 @@ was a real correctness bug that's been sitting there since day 1 and none of
 my clang++ eyeball checks would've ever caught it since i never happened to
 type an out-of-range 3-digit id.
 
+## day 10
+
+spec check - `src/spec/`. last box on the original todo list, all checked
+off now.
+
+spec file is stupidly simple on purpose: `present <id>`, `absent <id>`,
+`range <signal> <min> <max>`, `#` comments, one per line. present/absent just
+count matching ids in the log. range needs a `.dbc` - looks up which message
+has a signal by that name, decodes every occurrence in the log, fails if any
+of them land outside the bounds. bad lines in the spec get collected like
+everywhere else instead of aborting.
+
+`canbench check drive.log toy.spec toy.dbc` prints PASS/FAIL per rule plus a
+count, and the process exit code is 0 only if everything passed - so it's
+actually usable as a script/CI gate, not just a printout. tried it against a
+deliberately bad spec (`range EngineSpeed 0 5000` when the toy data hits
+11127) and got exit 1 with the offending value called out.
+
+edge cases i made sure were tests, not vibes: no dbc given for a range rule
+(fail, don't crash), a range rule for a signal name the dbc doesn't have
+(fail), a signal that's in the dbc but never shows up in this particular log
+(passes - nothing to check isn't a violation).
+
+ran the whole suite through ctest again since cmake's actually installed now
+- 51/51 green.
+
 ## next
 
-- spec check: point it at a log + a little rules file, get a pass/fail
-- eventually: real bus-off recovery (128x11 recessive bits), actual
-  bit-level corruption instead of a flag on the frame
+- everything on the original list is done. probably: real bus-off recovery,
+  timing/period rules in the spec language, maybe a second log format
+  (candump's `-tz` timestamp style, or a `vector .asc` file)
