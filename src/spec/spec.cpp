@@ -104,6 +104,19 @@ SpecFile parse_spec(std::string_view text) {
         out.rules.push_back(r);
         ok = true;
       }
+    } else if (toks.size() == 4 && toks[0] == "period") {
+      auto id = parse_hex_id(toks[1]);
+      auto lo = parse_num(toks[2]);
+      auto hi = parse_num(toks[3]);
+      if (id && lo && hi) {
+        Rule r;
+        r.kind = RuleKind::kPeriod;
+        r.id = *id;
+        r.lo = *lo;
+        r.hi = *hi;
+        out.rules.push_back(r);
+        ok = true;
+      }
     }
 
     if (!ok) {
@@ -138,6 +151,40 @@ std::vector<RuleResult> check_spec(const LogFile& log, const Dbc* dbc,
       std::string detail = "id " + hex_id(rule.id) + " seen " + std::to_string(count) +
                            " time" + (count == 1 ? "" : "s");
       results.push_back({rule, passed, detail});
+      continue;
+    }
+
+    if (rule.kind == RuleKind::kPeriod) {
+      std::vector<double> ts;
+      for (const auto& e : log.entries)
+        if (e.frame.id == rule.id) ts.push_back(e.ts);
+
+      char buf[128];
+      if (ts.size() < 2) {
+        std::snprintf(buf, sizeof(buf), "id %s seen fewer than twice, nothing to check period on",
+                      hex_id(rule.id).c_str());
+        results.push_back({rule, true, buf});
+        continue;
+      }
+
+      bool passed = true;
+      double worst = 0;
+      for (std::size_t i = 1; i < ts.size(); ++i) {
+        double gap = ts[i] - ts[i - 1];
+        if (gap < rule.lo || gap > rule.hi) {
+          passed = false;
+          worst = gap;
+        }
+      }
+
+      if (passed) {
+        std::snprintf(buf, sizeof(buf), "id %s gaps stayed in [%g, %g]s over %zu sends",
+                      hex_id(rule.id).c_str(), rule.lo, rule.hi, ts.size());
+      } else {
+        std::snprintf(buf, sizeof(buf), "id %s had a gap of %gs, outside [%g, %g]",
+                      hex_id(rule.id).c_str(), worst, rule.lo, rule.hi);
+      }
+      results.push_back({rule, passed, buf});
       continue;
     }
 

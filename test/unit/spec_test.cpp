@@ -29,6 +29,35 @@ TEST_CASE("parses present/absent/range", "[spec]") {
   CHECK(spec.rules[2].hi == 8000);
 }
 
+TEST_CASE("parses period", "[spec]") {
+  auto spec = parse_spec("period 123 0.08 0.12\n");
+  REQUIRE(spec.rules.size() == 1);
+  CHECK(spec.rules[0].kind == RuleKind::kPeriod);
+  CHECK(spec.rules[0].id == 0x123);
+  CHECK(spec.rules[0].lo == 0.08);
+  CHECK(spec.rules[0].hi == 0.12);
+}
+
+TEST_CASE("period rule checks the gaps between sends", "[spec]") {
+  auto log = parse_log(
+      "(0.00) can0 123#00\n"
+      "(0.10) can0 123#00\n"
+      "(0.20) can0 123#00\n"
+      "(0.21) can0 123#00\n");  // this gap is way too short
+
+  auto ok = check_spec(log, nullptr, parse_spec("period 123 0.05 0.15\n").rules);
+  CHECK_FALSE(ok[0].passed);  // the 0.01s gap trips it
+
+  auto lenient = check_spec(log, nullptr, parse_spec("period 123 0.0 1.0\n").rules);
+  CHECK(lenient[0].passed);
+}
+
+TEST_CASE("period rule with fewer than two sends passes vacuously", "[spec]") {
+  auto log = parse_log("(0.0) can0 123#00\n");
+  auto results = check_spec(log, nullptr, parse_spec("period 123 0.05 0.15\n").rules);
+  CHECK(results[0].passed);
+}
+
 TEST_CASE("bad lines are collected, not fatal", "[spec]") {
   auto spec = parse_spec(
       "present\n"           // missing id

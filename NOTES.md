@@ -223,8 +223,26 @@ edge cases i made sure were tests, not vibes: no dbc given for a range rule
 ran the whole suite through ctest again since cmake's actually installed now
 - 51/51 green.
 
+## day 11
+
+`period <id> <min> <max>` rule in the spec language - first thing off the
+"probably next" list. checks the gap between consecutive sends of an id
+stays inside a window, seconds. reused `Rule.lo/hi` for the gap bounds
+instead of adding new fields since it's the same shape as `range`.
+
+fewer than two sends of that id in the log = nothing to compare, so it
+passes vacuously, same call i made for range rules on a signal that never
+shows up. felt more honest than either failing (there's no violation to
+point to) or refusing to run.
+
+added it to `toy.spec` too: `period 123 0.03 0.07` against `drive.log`'s
+three 0x123 frames (gaps of ~0.056s and ~0.044s), passes.
+
+tests for the parse, a real gap violation, and the <2-sends case. 54/54
+through ctest.
+
 ## next
 
-- everything on the original list is done. probably: real bus-off recovery,
-  timing/period rules in the spec language, maybe a second log format
-  (candump's `-tz` timestamp style, or a `vector .asc` file)
+- everything on the original list is done, plus period checks now. probably:
+  real bus-off recovery, maybe a second log format (candump's `-tz`
+  timestamp style, or a vector `.asc` file)

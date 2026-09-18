@@ -77,9 +77,11 @@ bus order (35 frames sent):
 `check` is the last item on the original list - point it at a log and a spec
 file, get a pass/fail per rule and an overall exit code (0 if everything
 passed, 1 if anything failed, so it's usable in a script). the spec language
-is tiny: `present <id>`, `absent <id>`, `range <signal> <min> <max>` (the
-range rules need a `.dbc` to know how to decode the signal). one rule per
-line, `#` comments:
+is tiny: `present <id>`, `absent <id>`, `range <signal> <min> <max>` (needs a
+`.dbc` to decode the signal), `period <id> <min> <max>` (checks the gap
+between consecutive sends of that id stays inside `[min, max]` seconds - a
+quick way to catch a node that's fallen off its normal send rate). one rule
+per line, `#` comments:
 
 ```
 $ canbench check drive.log toy.spec toy.dbc
@@ -89,7 +91,8 @@ PASS  id 0x999 seen 0 times
 PASS  EngineSpeed stayed in [0, 16383.8] over 3 frames
 PASS  CoolantTemp stayed in [-40, 215] over 3 frames
 PASS  Gear stayed in [0, 8] over 2 frames
--- 6/6 rules passed
+PASS  id 0x123 gaps stayed in [0.03, 0.07]s over 3 sends
+-- 7/7 rules passed
 ```
 `wave` draws the frame the way it goes out on the wire - a square wave with the
 fields marked and every stuff bit flagged:

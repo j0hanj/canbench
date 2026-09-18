@@ -8,9 +8,13 @@
 //   range EngineSpeed 0 8000   - every EngineSpeed value in the log has to
 //                                land inside [0, 8000] (needs a .dbc so we
 //                                know how to decode EngineSpeed)
+//   period 123 0.08 0.12       - the gap between consecutive 0x123 frames
+//                                has to land inside [0.08, 0.12] seconds -
+//                                catches a node that's dropped off its
+//                                normal send rate, sending too fast/slow
 //
-// ids are hex, no "0x". that's the whole language for now - no timing rules,
-// no "signal X implies signal Y", just presence/absence/range.
+// ids are hex, no "0x". that's the whole language for now - no "signal X
+// implies signal Y", no rate-of-change checks.
 
 #ifndef CANBENCH_SPEC_HPP
 #define CANBENCH_SPEC_HPP
@@ -26,13 +30,13 @@
 
 namespace canbench {
 
-enum class RuleKind { kPresent, kAbsent, kRange };
+enum class RuleKind { kPresent, kAbsent, kRange, kPeriod };
 
 struct Rule {
   RuleKind kind;
-  std::uint32_t id = 0;    // present/absent
+  std::uint32_t id = 0;    // present/absent/period
   std::string signal;      // range
-  double lo = 0, hi = 0;   // range
+  double lo = 0, hi = 0;   // range: value bounds. period: gap bounds, seconds
 };
 
 struct SpecFile {
