@@ -241,8 +241,41 @@ three 0x123 frames (gaps of ~0.056s and ~0.044s), passes.
 tests for the parse, a real gap violation, and the <2-sends case. 54/54
 through ctest.
 
+## day 12
+
+second log format - `src/log/asc.hpp` for Vector's `.asc` (what
+CANoe/CANalyzer export). reused `LogFile`/`LogEntry`/`LogError` from
+`log.hpp` as-is instead of inventing a parallel type - `dump`, `signals`,
+`check` don't know or care which reader produced the log they got, main.cpp
+just picks by file extension (`read_any_log()`, `.asc` vs anything else).
+
+the frame line format is different enough from candump to be interesting:
+
+```
+0.001000 1  123             Rx   d 4 DE AD BE EF
+0.002500 1  1F334455x       Rx   d 2 11 22
+```
+timestamp, channel, id, Rx/Tx, d/r, dlc, data bytes. the neat bit: extended
+ids get an explicit trailing `x` instead of candump's "count the hex digits"
+convention - actually less ambiguous. header lines (`date`, `base`, `no
+internal events logged`, `Begin/End Triggerblock`) don't start with a number,
+so the parser just skips any line whose first token isn't a timestamp,
+rather than trying to enumerate every header variant CANoe might emit.
+
+remembered the id-overflow bug from day 9 this time - a non-`x` id over
+0x7FF is rejected outright instead of getting quietly upgraded to extended.
+wrote the test for that specifically before writing the fix, for once.
+
+made `drive.asc` as the exact same frames as `drive.log` and diffed
+`dump`/`signals`/`check` output between the two - identical (down to the
+float-precision `0.0999999s` vs `0.1s` span quirk, which only candump's
+raw-epoch timestamps hit since the asc file's timestamps start at 0). good
+sign the abstraction actually holds.
+
+58/58 through ctest.
+
 ## next
 
-- everything on the original list is done, plus period checks now. probably:
-  real bus-off recovery, maybe a second log format (candump's `-tz`
-  timestamp style, or a vector `.asc` file)
+- everything on the original list is done, plus period checks and now two
+  log formats. probably: real bus-off recovery, or timing rules that look
+  across different ids (not just one id's own gaps)

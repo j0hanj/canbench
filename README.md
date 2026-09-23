@@ -37,8 +37,11 @@ canbench check drive.log drive.spec toy.dbc
 ```
 
 `decode` prints the fields, the crc, and the raw bit sequence for one frame.
-`dump` reads a whole `candump -l` file and lists every frame with its time
-offset, bus, and bytes, plus a count of anything that didn't parse.
+`dump` reads a whole log and lists every frame with its time offset, bus, and
+bytes, plus a count of anything that didn't parse. it takes either a
+`candump -l` `.log` file or a Vector `.asc` (the CANoe/CANalyzer format) -
+picked by the file extension, and `signals`/`check` take either too. same
+`LogFile` either way, so nothing downstream cares which one it got.
 `signals` matches each logged frame against the `.dbc` and prints the decoded
 values - rpm, coolant temp, wheel speeds - with units. handles both Intel and
 Motorola bit layouts and signed signals.

@@ -1,4 +1,5 @@
-// canbench cli. `decode` does one frame, `dump` reads a candump .log.
+// canbench cli. `decode` does one frame, `dump`/`signals`/`check` read a log -
+// candump .log or vector .asc, picked by extension.
 
 #include <algorithm>
 #include <cstdio>
@@ -12,22 +13,31 @@
 #include "bus/bus.hpp"
 #include "dbc/dbc.hpp"
 #include "frame/frame.hpp"
+#include "log/asc.hpp"
 #include "log/log.hpp"
 #include "spec/spec.hpp"
 #include "wave/wave.hpp"
 
 namespace {
 
+// candump .log or vector .asc - pick by extension so dump/signals/check
+// don't have to care which one they got.
+std::optional<canbench::LogFile> read_any_log(std::string_view path) {
+  bool asc = path.size() >= 4 &&
+            (path.substr(path.size() - 4) == ".asc" || path.substr(path.size() - 4) == ".ASC");
+  return asc ? canbench::read_asc(std::string(path)) : canbench::read_log(std::string(path));
+}
+
 int usage(std::ostream& os) {
   os << "usage: canbench <cmd> [args]\n"
         "  decode <frame>   parse one frame like 123#DEADBEEF and print it\n"
-        "  dump <file.log>  read a candump .log and list every frame\n"
-        "  signals <file.log> <file.dbc>   decode named signals from a log\n"
+        "  dump <file.log|file.asc>  list every frame (candump .log or vector .asc)\n"
+        "  signals <file.log|.asc> <file.dbc>   decode named signals from a log\n"
         "  wave <frame>     draw one frame as an ascii square wave\n"
         "  arb <frame>...   sort frames into bus arbitration order\n"
         "  sim <node>:<frame>[!][,<frame>[!]...] ...   run a fake bus with error\n"
         "      counters + bus-off. '!' after a frame injects a fault on it\n"
-        "  check <file.log> <file.spec> [file.dbc]   run a log against a spec\n"
+        "  check <file.log|.asc> <file.spec> [file.dbc]   run a log against a spec\n"
         "  -v / --version\n"
         "  -h / --help\n";
   return 0;
@@ -47,7 +57,7 @@ int decode(std::string_view text) {
 }
 
 int dump(std::string_view path) {
-  auto log = canbench::read_log(std::string(path));
+  auto log = read_any_log(path);
   if (!log) {
     std::cerr << "canbench: can't open '" << path << "'\n";
     return 1;
@@ -74,7 +84,7 @@ int dump(std::string_view path) {
 }
 
 int signals(std::string_view log_path, std::string_view dbc_path) {
-  auto log = canbench::read_log(std::string(log_path));
+  auto log = read_any_log(log_path);
   if (!log) {
     std::cerr << "canbench: can't open '" << log_path << "'\n";
     return 1;
@@ -215,7 +225,7 @@ int sim(const std::vector<std::string_view>& texts) {
 }
 
 int check(std::string_view log_path, std::string_view spec_path, std::string_view dbc_path) {
-  auto log = canbench::read_log(std::string(log_path));
+  auto log = read_any_log(log_path);
   if (!log) {
     std::cerr << "canbench: can't open '" << log_path << "'\n";
     return 2;

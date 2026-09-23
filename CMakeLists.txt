@@ -15,6 +15,7 @@ add_compile_options(-Wall -Wextra)
 add_library(canbench_core STATIC
   src/frame/frame.cpp
   src/log/log.cpp
+  src/log/asc.cpp
   src/dbc/dbc.cpp
   src/wave/wave.cpp
   src/bus/bus.cpp
