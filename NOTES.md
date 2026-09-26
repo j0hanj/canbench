@@ -274,8 +274,26 @@ sign the abstraction actually holds.
 
 58/58 through ctest.
 
+## day 13
+
+small one - noticed the `.asc` vs `.log` extension check in main.cpp was
+case-sensitive-ish (`== ".asc" || == ".ASC"`, so `drive.Asc` would've quietly
+gone through the candump parser and failed to make sense of it). also it
+lived straight in the cli, untested, unlike literally everything else in
+this project.
+
+pulled it out of the cli into `src/log/reader.hpp` - `guess_format()` does a
+real case-insensitive suffix check, `read_any_log()` wraps it. same three
+callers (`dump`/`signals`/`check`), but now the dispatch logic lives in
+canbench_core where it can actually be tested, instead of sitting untested
+in main.cpp like it was.
+
+tests in `reader_test.cpp` for the case-insensitivity plus the edge cases
+(`weird.asc.log` should go candump - last extension wins, `asc` with no dot
+is too short to match). 60/60 through ctest.
+
 ## next
 
-- everything on the original list is done, plus period checks and now two
-  log formats. probably: real bus-off recovery, or timing rules that look
-  across different ids (not just one id's own gaps)
+- everything on the original list is done, plus period checks and two log
+  formats. probably: real bus-off recovery, or timing rules that look across
+  different ids (not just one id's own gaps)
