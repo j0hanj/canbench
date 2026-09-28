@@ -34,6 +34,8 @@ canbench wave 123#DEADBEEF
 canbench arb 200#R 100#00 7DF#0201
 canbench sim ecu:100#DEADBEEF,500#00 abs:200#R,100#01 dash:7DF#0201
 canbench check drive.log drive.spec toy.dbc
+canbench inject 123#DEADBEEF
+canbench inject 123#DEADBEEF 40
 ```
 
 `decode` prints the fields, the crc, and the raw bit sequence for one frame.
@@ -77,6 +79,44 @@ bus order (35 frames sent):
   ecu  sent 32/34  tec=256 rec=0  BUS-OFF  (2 never sent)
   abs  sent 3/3  tec=0 rec=32  active
 ```
+`inject` is the bit-level version of fault injection. it takes a frame, builds
+its on-wire bits, flips one, and runs the result through a receiver
+(`src/frame/wire.cpp`) that un-stuffs it, walks the fields, and checks the crc -
+so you see which error a real node would actually trip. with a bit index it
+flips that one bit; without one it sweeps every bit of the frame:
+
+```
+$ canbench inject 123#DEADBEEF
+81 single-bit flips of id=0x123 std data dlc=4 [DE AD BE EF]
+
+  field       bits   stuff   form   crc  trunc    ok
+  SOF            1       0      1     0      0     0
+  id            11       2      0     9      0     0
+  control        3       0      1     2      0     0
+  dlc            4       4      0     0      0     0
+  data          33       5      0    28      0     0
+  crc           16       1      0    15      0     0
+  crc delim      1       0      1     0      0     0
+  ack slot       1       0      0     0      0     1
+  ack delim      1       0      1     0      0     0
+  eof            7       0      7     0      0     0
+  ifs            3       0      0     0      0     3
+
+77/81 flips caught by the receiver.
+
+$ canbench inject 123#DEADBEEF 40
+flip      wire bit 40 (data), 1 -> 0
+receiver  crc error, caught at wire bit 66
+sees      id=0x123 std data dlc=4 [DE AD BA 77]
+```
+
+note the last one - that flip broke a run of five equal bits, so the real stuff
+bit after it stopped looking like a stuff bit. the receiver read it as data,
+everything after slid over by one, and it ended up with garbage bytes. the crc
+is what saves it. the only flips nothing catches are the ack slot (that just
+looks like someone acked) and the interframe space, which a receiver doesn't
+look at.
+
 `check` is the last item on the original list - point it at a log and a spec
 file, get a pass/fail per rule and an overall exit code (0 if everything
 passed, 1 if anything failed, so it's usable in a script). the spec language
@@ -118,7 +158,7 @@ id=0x123 std data dlc=4 [DE AD BE EF]   81 bits on the wire, 2 stuffed
 - [x] .dbc parser -> named signals
 - [x] virtual bus w/ arbitration (round-based, no bit timing yet)
 - [x] error counters + bus-off
-- [x] fault injection (flip a flag on a frame for now, not a real bit-level corrupt)
+- [x] fault injection (`sim` marks whole frames bad, `inject` flips real bits on the wire and decodes them)
 - [x] spec check w/ pass/fail
 - [x] some kind of waveform view (ascii for now)
 

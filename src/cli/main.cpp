@@ -2,7 +2,9 @@
 // candump .log or vector .asc, picked by extension.
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <optional>
 #include <set>
@@ -13,6 +15,7 @@
 #include "bus/bus.hpp"
 #include "dbc/dbc.hpp"
 #include "frame/frame.hpp"
+#include "frame/wire.hpp"
 #include "log/reader.hpp"
 #include "spec/spec.hpp"
 #include "wave/wave.hpp"
@@ -29,6 +32,8 @@ int usage(std::ostream& os) {
         "  sim <node>:<frame>[!][,<frame>[!]...] ...   run a fake bus with error\n"
         "      counters + bus-off. '!' after a frame injects a fault on it\n"
         "  check <file.log|.asc> <file.spec> [file.dbc]   run a log against a spec\n"
+        "  inject <frame> [bit]   flip wire bits and see which error a receiver trips\n"
+        "      (no bit = sweep every bit of the frame)\n"
         "  -v / --version\n"
         "  -h / --help\n";
   return 0;
@@ -215,6 +220,81 @@ int sim(const std::vector<std::string_view>& texts) {
   return 0;
 }
 
+const char* field_name(canbench::Field f) {
+  switch (f) {
+    case canbench::Field::kSof: return "SOF";
+    case canbench::Field::kId: return "id";
+    case canbench::Field::kControl: return "control";
+    case canbench::Field::kDlc: return "dlc";
+    case canbench::Field::kData: return "data";
+    case canbench::Field::kCrc: return "crc";
+    case canbench::Field::kCrcDelim: return "crc delim";
+    case canbench::Field::kAck: return "ack slot";
+    case canbench::Field::kAckDelim: return "ack delim";
+    case canbench::Field::kEof: return "eof";
+    case canbench::Field::kIfs: return "ifs";
+  }
+  return "?";
+}
+
+int inject(std::string_view text, std::optional<std::size_t> bit) {
+  auto f = canbench::parse_short(text);
+  if (!f) {
+    std::cerr << "canbench: can't parse '" << text << "'\n";
+    return 1;
+  }
+  auto sweep = canbench::sweep_single_flips(*f);
+
+  if (bit) {
+    if (*bit >= sweep.size()) {
+      std::cerr << "canbench: bit " << *bit << " is past the end (frame is " << sweep.size()
+                << " bits on the wire)\n";
+      return 1;
+    }
+    const auto& r = sweep[*bit];
+    std::cout << canbench::describe(*f) << '\n'
+              << "flip      wire bit " << r.bit << " (" << field_name(r.field)
+              << (r.stuffed ? ", stuff bit" : "") << "), "
+              << (r.was == canbench::Bit::kDominant ? "0 -> 1" : "1 -> 0") << '\n';
+    if (r.outcome.error == canbench::WireError::kNone) {
+      std::cout << "receiver  no error" << (r.outcome.acked ? " (ack slot reads dominant = acked)" : "")
+                << '\n';
+    } else {
+      std::cout << "receiver  " << canbench::error_name(r.outcome.error) << ", caught at wire bit "
+                << r.outcome.error_at << '\n';
+    }
+    if (r.outcome.frame) std::cout << "sees      " << canbench::describe(*r.outcome.frame) << '\n';
+    return 0;
+  }
+
+  // sweep: tally what each single-bit flip turned into, per field
+  constexpr int kFields = 11;
+  constexpr int kKinds = 5;  // none, stuff, form, crc, truncated
+  std::array<std::array<int, kKinds>, kFields> tally{};
+  std::array<int, kFields> bits{};
+  for (const auto& r : sweep) {
+    ++bits[static_cast<int>(r.field)];
+    ++tally[static_cast<int>(r.field)][static_cast<int>(r.outcome.error)];
+  }
+
+  std::cout << sweep.size() << " single-bit flips of " << canbench::describe(*f) << "\n\n";
+  std::printf("  %-10s %5s %7s %6s %5s %6s %5s\n", "field", "bits", "stuff", "form", "crc",
+              "trunc", "ok");
+  int undetected = 0;
+  for (int i = 0; i < kFields; ++i) {
+    if (bits[i] == 0) continue;
+    const auto& t = tally[i];
+    std::printf("  %-10s %5d %7d %6d %5d %6d %5d\n", field_name(static_cast<canbench::Field>(i)),
+                bits[i], t[1], t[2], t[3], t[4], t[0]);
+    undetected += t[0];
+  }
+  std::cout << "\n" << (sweep.size() - undetected) << "/" << sweep.size()
+            << " flips caught by the receiver. stuff/form/crc/trunc = which error the flip\n"
+               "tripped. 'ok' = nothing tripped (flipping the ack slot just reads as an ack, and\n"
+               "the ifs after eof isn't looked at).\n";
+  return 0;
+}
+
 int check(std::string_view log_path, std::string_view spec_path, std::string_view dbc_path) {
   auto log = canbench::read_any_log(std::string(log_path));
   if (!log) {
@@ -304,6 +384,24 @@ int main(int argc, char** argv) {
       return 2;
     }
     return sim({args.begin() + 1, args.end()});
+  }
+  if (cmd == "inject") {
+    if (args.size() != 2 && args.size() != 3) {
+      std::cerr << "canbench: inject wants a frame and optionally a bit index\n";
+      return 2;
+    }
+    std::optional<std::size_t> bit;
+    if (args.size() == 3) {
+      std::string b(args[2]);
+      char* end = nullptr;
+      unsigned long v = std::strtoul(b.c_str(), &end, 10);
+      if (b.empty() || *end != '\0') {
+        std::cerr << "canbench: '" << b << "' isn't a bit index\n";
+        return 2;
+      }
+      bit = static_cast<std::size_t>(v);
+    }
+    return inject(args[1], bit);
   }
   if (cmd == "check") {
     if (args.size() != 3 && args.size() != 4) {

@@ -292,8 +292,58 @@ tests in `reader_test.cpp` for the case-insensitivity plus the edge cases
 (`weird.asc.log` should go candump - last extension wins, `asc` with no dot
 is too short to match). 60/60 through ctest.
 
+## day 14
+
+bit-level fault injection. this was the thing i'd been calling "just a flag on
+the frame" since day 8 and it always bugged me - `sim` says a frame is bad but
+never says *why* or what a receiver would actually do about it.
+
+so i wrote the other half of the wire: `src/frame/wire.hpp`, `decode_wire()`.
+`bit_timeline()` goes frame -> bits, this goes bits -> frame. it destuffs as it
+reads (a `WireReader` that mirrors the encoder - nothing before SOF, a stuff bit
+counts as bit 1 of the next run, and the last crc bit can be followed by a stuff
+bit too), walks sof/id/control/dlc/data/crc, and reports the first thing that
+goes wrong:
+- stuff error: six equal bits where a stuff bit should be
+- form error: sof not dominant, crc/ack delimiter or eof not recessive, srr
+  dominant on an extended frame
+- crc error: what i computed over what i read != what was on the wire
+- truncated: ran out of bits (a flipped dlc sends it hunting for bytes that
+  don't exist)
+
+not modelled: bit error and ack error, they're the *transmitter's* checks (it
+notices the wire disagrees with what it drove / nobody acked). i just report
+whether the ack slot came back dominant. also cheated a little: any dominant eof
+bit is a form error, real receivers let the last one slide (overload frame).
+
+`sweep_single_flips()` flips every bit of a frame's timeline one at a time and
+decodes each. `canbench inject 123#DEADBEEF` prints it as a per-field table,
+`inject <frame> <bit>` does one flip and shows what the receiver ends up seeing.
+
+things i learned from actually running it:
+- 77/81 flips of `123#DEADBEEF` are caught. the 4 that aren't: the ack slot
+  (flipping it just looks like an ack) and the 3 ifs bits. everything sof..eof
+  gets caught, and there's a test that sweeps 14 different frames (std, ext,
+  remote, every dlc, all-zeros / all-ones stuffing torture) and asserts that.
+  that's the crc-15 + stuffing doing what they're supposed to.
+- a flipped bit can break a run of five and orphan a stuff bit. flipping bit 40
+  turns `11111` into `11101`, so the real stuff bit two places later (wire bit
+  42) no longer follows a run of five - the destuffer reads it as data and
+  everything after slides by one, giving `DE AD BA 77` instead of
+  `DE AD BE EF`. checked by destuffing both versions by hand: original drops
+  stuff bits at 42 and 53, the flipped one only at 53. crc catches it, but it's
+  a neat demo of why stuff bits are inside the crc-covered span.
+- my first truncation test failed because it chopped only the interframe space,
+  which the decoder correctly ignores. test was wrong, decoder was right.
+
+`sim` still uses the `!` flag. next step would be having `!` mean "flip a random
+bit and let the decoder decide the error" so tec/rec get bumped by real detected
+errors rather than a bool. haven't done that yet.
+
+68/68 through ctest.
+
 ## next
 
-- everything on the original list is done, plus period checks and two log
-  formats. probably: real bus-off recovery, or timing rules that look across
-  different ids (not just one id's own gaps)
+- make `sim`'s `!` drive a real bit flip through `decode_wire` instead of a bool
+- real bus-off recovery, or timing rules that look across different ids (not
+  just one id's own gaps)

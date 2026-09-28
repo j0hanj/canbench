@@ -14,6 +14,7 @@ add_compile_options(-Wall -Wextra)
 # core lib, grows as i add stuff
 add_library(canbench_core STATIC
   src/frame/frame.cpp
+  src/frame/wire.cpp
   src/log/log.cpp
   src/log/asc.cpp
   src/log/reader.cpp
