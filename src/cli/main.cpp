@@ -205,7 +205,7 @@ int sim(const std::vector<std::string_view>& texts) {
                   i + 1, t.node.c_str(), canbench::describe(t.frame).c_str(),
                   t.counters.tec, t.counters.rec, state_name(t.state));
     std::cout << line;
-    if (t.faulty) std::cout << "  [FAULT]";
+    if (t.faulty) std::cout << "  [FAULT: " << canbench::error_name(t.wire_error) << "]";
     std::cout << '\n';
   }
 

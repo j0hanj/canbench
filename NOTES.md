@@ -342,8 +342,34 @@ errors rather than a bool. haven't done that yet.
 
 68/68 through ctest.
 
+## day 15
+
+closed out yesterday's "next": `sim`'s `!` actually flips a bit now instead
+of just being a bool that means "pretend this is bad."
+
+`corrupt_one_bit(f)` in `wire.cpp` - flips the last data bit, or the last
+control bit if the frame carries no data (remote frames, so there's always
+somewhere to flip), and runs it through `decode_wire`. `run_bus` calls that
+for every faulty queued frame and stashes the real `WireError` on the
+`Transmission` instead of just the bool. tec/rec math is unchanged - still
++8/+1 - the difference is the *reason* is now grounded in an actual
+corrupted frame instead of asserted.
+
+`canbench sim` output changed from `[FAULT]` to `[FAULT: crc error]` (it's
+basically always a crc error for a data corruption - stuff errors would need
+the flip to land right next to a run of five, which `corrupt_one_bit` isn't
+aiming for). checked a remote frame (`200#R!`, no data) actually exercises
+the control-field fallback instead of silently doing nothing.
+
+tests: `corrupt_one_bit` always trips something (swept the same 14-frame
+spread from yesterday, remote frames included), and on the bus side "a
+faulty send carries the real error the receiver caught" / "a clean send has
+no wire error" - so the bool and the real error can't quietly drift apart
+again. 72/72 through ctest.
+
 ## next
 
-- make `sim`'s `!` drive a real bit flip through `decode_wire` instead of a bool
 - real bus-off recovery, or timing rules that look across different ids (not
   just one id's own gaps)
+- maybe let `corrupt_one_bit` pick a random bit instead of always the same
+  spot, so stuff errors show up in the sim sometimes too

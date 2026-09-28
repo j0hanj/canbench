@@ -193,4 +193,26 @@ std::vector<FlipResult> sweep_single_flips(const Frame& f) {
   return out;
 }
 
+WireDecode corrupt_one_bit(const Frame& f) {
+  std::vector<WireBit> ann = annotated_timeline(f);
+
+  // last data bit if there is any data, else the last control bit - every
+  // frame has a control field (rtr/ide and friends) so this always finds one
+  std::optional<std::size_t> target;
+  for (std::size_t i = 0; i < ann.size(); ++i)
+    if (ann[i].field == Field::kData) target = i;
+  if (!target) {
+    for (std::size_t i = 0; i < ann.size(); ++i)
+      if (ann[i].field == Field::kControl) target = i;
+  }
+
+  std::vector<Bit> wire;
+  wire.reserve(ann.size());
+  for (const WireBit& wb : ann) wire.push_back(wb.level);
+  if (target)
+    wire[*target] = (wire[*target] == Bit::kDominant) ? Bit::kRecessive : Bit::kDominant;
+
+  return decode_wire(wire);
+}
+
 }  // namespace canbench

@@ -35,7 +35,11 @@ BusResult run_bus(std::vector<Node> nodes) {
     nodes[winner].queue.erase(nodes[winner].queue.begin());
     ++sent[winner];
 
+    WireError wire_error = WireError::kNone;
     if (qf.faulty) {
+      // actually corrupt a bit and let the decoder say what broke, rather
+      // than just assuming something did
+      wire_error = corrupt_one_bit(qf.frame).error;
       note_tx_error(counters[winner]);
     } else {
       note_tx_ok(counters[winner]);
@@ -49,8 +53,8 @@ BusResult run_bus(std::vector<Node> nodes) {
       else note_rx_ok(counters[i]);
     }
 
-    result.log.push_back(
-        {nodes[winner].name, qf.frame, qf.faulty, counters[winner], classify(counters[winner])});
+    result.log.push_back({nodes[winner].name, qf.frame, qf.faulty, wire_error, counters[winner],
+                          classify(counters[winner])});
   }
 
   for (std::size_t i = 0; i < nodes.size(); ++i) {

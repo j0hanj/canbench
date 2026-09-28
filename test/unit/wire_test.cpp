@@ -6,6 +6,7 @@
 
 using canbench::Bit;
 using canbench::bit_timeline;
+using canbench::corrupt_one_bit;
 using canbench::decode_wire;
 using canbench::Field;
 using canbench::Frame;
@@ -128,4 +129,15 @@ TEST_CASE("truncated input is reported, not read past", "[wire]") {
   // dropping just the interframe space is fine - a receiver is done at eof
   std::vector<Bit> no_ifs(wire.begin(), wire.end() - 3);
   CHECK(decode_wire(no_ifs).error == WireError::kNone);
+}
+
+TEST_CASE("corrupt_one_bit always trips a real error", "[wire]") {
+  // this is what the bus sim's '!' actually calls now - every frame in the
+  // spread (including the data-less remote ones) has to come back broken
+  for (const Frame& f : sample_frames()) CHECK(corrupt_one_bit(f).error != WireError::kNone);
+}
+
+TEST_CASE("corrupt_one_bit on a data-less frame hits the control field", "[wire]") {
+  auto d = corrupt_one_bit(*parse_short("200#R"));
+  CHECK(d.error != WireError::kNone);
 }

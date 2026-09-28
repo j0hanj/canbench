@@ -7,6 +7,7 @@ using canbench::Node;
 using canbench::parse_short;
 using canbench::QueuedFrame;
 using canbench::run_bus;
+using canbench::WireError;
 
 namespace {
 
@@ -106,4 +107,18 @@ TEST_CASE("a node's own sends never move its own rec", "[bus]") {
   const auto* abs = &r.nodes[1];
   CHECK(abs->counters.tec == 0);  // rx events only touch rec, never tec
   CHECK(abs->state == BusState::kActive);
+}
+
+TEST_CASE("a faulty send carries the real error the receiver caught", "[bus]") {
+  auto r = run_bus({node("ecu", {qf("100#DEADBEEF", true)})});
+  REQUIRE(r.log.size() == 1);
+  CHECK(r.log[0].faulty);
+  CHECK(r.log[0].wire_error != WireError::kNone);
+}
+
+TEST_CASE("a clean send has no wire error", "[bus]") {
+  auto r = run_bus({node("ecu", {qf("100#DEADBEEF", false)})});
+  REQUIRE(r.log.size() == 1);
+  CHECK_FALSE(r.log[0].faulty);
+  CHECK(r.log[0].wire_error == WireError::kNone);
 }

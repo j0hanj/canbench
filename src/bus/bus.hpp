@@ -1,11 +1,12 @@
 // the fake bus, now with faults. every round, every node with something left
 // contends, arbitration_cmp picks the winner, that frame goes out. mark a
-// queued frame `faulty` to simulate it getting corrupted on the wire (bad
-// crc, dropped ack, whatever - we don't care which, just that everyone
-// detects it): the sender takes a transmit error, everyone else still on the
-// bus takes a receive error, and errors.hpp's rules push their counters
-// around. a node whose TEC goes past 255 goes bus-off and stops contending -
-// its remaining queued frames never go out.
+// queued frame `faulty` and run_bus actually corrupts one bit of it on the
+// wire (via frame/wire.hpp's corrupt_one_bit) and runs a real receiver over
+// the result to see what breaks - not just an assumed "something's wrong".
+// the sender takes a transmit error, everyone else still on the bus takes a
+// receive error, and errors.hpp's rules push their counters around. a node
+// whose TEC goes past 255 goes bus-off and stops contending - its remaining
+// queued frames never go out.
 
 #ifndef CANBENCH_BUS_HPP
 #define CANBENCH_BUS_HPP
@@ -15,6 +16,7 @@
 
 #include "bus/errors.hpp"
 #include "frame/frame.hpp"
+#include "frame/wire.hpp"
 
 namespace canbench {
 
@@ -32,6 +34,7 @@ struct Transmission {
   std::string node;
   Frame frame;
   bool faulty = false;
+  WireError wire_error = WireError::kNone;  // what the receiver actually caught, if faulty
   ErrorCounters counters;  // sender's counters right after this send
   BusState state;          // sender's state right after this send
 };
