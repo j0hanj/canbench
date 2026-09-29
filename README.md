@@ -126,8 +126,10 @@ passed, 1 if anything failed, so it's usable in a script). the spec language
 is tiny: `present <id>`, `absent <id>`, `range <signal> <min> <max>` (needs a
 `.dbc` to decode the signal), `period <id> <min> <max>` (checks the gap
 between consecutive sends of that id stays inside `[min, max]` seconds - a
-quick way to catch a node that's fallen off its normal send rate). one rule
-per line, `#` comments:
+quick way to catch a node that's fallen off its normal send rate), and
+`follows <a> <b> <max_gap>` (every `a` has to be answered by a `b` within
+`max_gap` seconds - the request/response shape, like an OBD-II query and its
+reply). one rule per line, `#` comments:
 
 ```
 $ canbench check drive.log toy.spec toy.dbc

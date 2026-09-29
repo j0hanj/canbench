@@ -88,8 +88,23 @@ SpecFile parse_spec(std::string_view text) {
 
     if (toks.size() == 2 && (toks[0] == "present" || toks[0] == "absent")) {
       if (auto id = parse_hex_id(toks[1])) {
-        out.rules.push_back(
-            {toks[0] == "present" ? RuleKind::kPresent : RuleKind::kAbsent, *id, "", 0, 0});
+        Rule r;
+        r.kind = toks[0] == "present" ? RuleKind::kPresent : RuleKind::kAbsent;
+        r.id = *id;
+        out.rules.push_back(r);
+        ok = true;
+      }
+    } else if (toks.size() == 4 && toks[0] == "follows") {
+      auto id = parse_hex_id(toks[1]);
+      auto id2 = parse_hex_id(toks[2]);
+      auto hi = parse_num(toks[3]);
+      if (id && id2 && hi) {
+        Rule r;
+        r.kind = RuleKind::kFollows;
+        r.id = *id;
+        r.id2 = *id2;
+        r.hi = *hi;
+        out.rules.push_back(r);
         ok = true;
       }
     } else if (toks.size() == 4 && toks[0] == "range") {
@@ -151,6 +166,44 @@ std::vector<RuleResult> check_spec(const LogFile& log, const Dbc* dbc,
       std::string detail = "id " + hex_id(rule.id) + " seen " + std::to_string(count) +
                            " time" + (count == 1 ? "" : "s");
       results.push_back({rule, passed, detail});
+      continue;
+    }
+
+    if (rule.kind == RuleKind::kFollows) {
+      std::vector<double> b_ts;
+      for (const auto& e : log.entries)
+        if (e.frame.id == rule.id2) b_ts.push_back(e.ts);
+
+      bool passed = true;
+      double worst_a = 0;
+      int checked = 0;
+      for (const auto& e : log.entries) {
+        if (e.frame.id != rule.id) continue;
+        ++checked;
+        bool answered = false;
+        for (double bt : b_ts) {
+          if (bt >= e.ts && bt - e.ts <= rule.hi) { answered = true; break; }
+        }
+        if (!answered) {
+          passed = false;
+          worst_a = e.ts;
+        }
+      }
+
+      char buf[160];
+      if (checked == 0) {
+        std::snprintf(buf, sizeof(buf), "id %s never appeared - nothing to check a response for",
+                      hex_id(rule.id).c_str());
+        results.push_back({rule, true, buf});
+      } else if (passed) {
+        std::snprintf(buf, sizeof(buf), "every id %s was answered by id %s within %gs (%d checked)",
+                      hex_id(rule.id).c_str(), hex_id(rule.id2).c_str(), rule.hi, checked);
+        results.push_back({rule, true, buf});
+      } else {
+        std::snprintf(buf, sizeof(buf), "id %s at t=%g got no id %s within %gs", hex_id(rule.id).c_str(),
+                      worst_a, hex_id(rule.id2).c_str(), rule.hi);
+        results.push_back({rule, false, buf});
+      }
       continue;
     }
 

@@ -58,6 +58,43 @@ TEST_CASE("period rule with fewer than two sends passes vacuously", "[spec]") {
   CHECK(results[0].passed);
 }
 
+TEST_CASE("parses follows", "[spec]") {
+  auto spec = parse_spec("follows 7DF 7E8 0.05\n");
+  REQUIRE(spec.rules.size() == 1);
+  CHECK(spec.rules[0].kind == RuleKind::kFollows);
+  CHECK(spec.rules[0].id == 0x7DF);
+  CHECK(spec.rules[0].id2 == 0x7E8);
+  CHECK(spec.rules[0].hi == 0.05);
+}
+
+TEST_CASE("follows rule checks every request gets an answer in time", "[spec]") {
+  auto log = parse_log(
+      "(0.00) can0 7DF#00\n"
+      "(0.02) can0 7E8#00\n"   // answers the first request, well inside 0.05s
+      "(1.00) can0 7DF#00\n"
+      "(1.10) can0 7E8#00\n"); // this one took 0.1s - too slow
+
+  auto results = check_spec(log, nullptr, parse_spec("follows 7DF 7E8 0.05\n").rules);
+  CHECK_FALSE(results[0].passed);
+
+  auto lenient = check_spec(log, nullptr, parse_spec("follows 7DF 7E8 0.2\n").rules);
+  CHECK(lenient[0].passed);
+}
+
+TEST_CASE("follows rule: an answer has to come after the request, not before", "[spec]") {
+  auto log = parse_log(
+      "(0.00) can0 7E8#00\n"   // an answer with no request behind it - doesn't count
+      "(1.00) can0 7DF#00\n"); // this request gets nothing
+  auto results = check_spec(log, nullptr, parse_spec("follows 7DF 7E8 5.0\n").rules);
+  CHECK_FALSE(results[0].passed);
+}
+
+TEST_CASE("follows rule passes vacuously when the request never happens", "[spec]") {
+  auto log = parse_log("(0.0) can0 456#00\n");
+  auto results = check_spec(log, nullptr, parse_spec("follows 7DF 7E8 0.05\n").rules);
+  CHECK(results[0].passed);
+}
+
 TEST_CASE("bad lines are collected, not fatal", "[spec]") {
   auto spec = parse_spec(
       "present\n"           // missing id

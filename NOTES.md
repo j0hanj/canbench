@@ -367,9 +367,38 @@ faulty send carries the real error the receiver caught" / "a clean send has
 no wire error" - so the bool and the real error can't quietly drift apart
 again. 72/72 through ctest.
 
+## day 16
+
+`follows <a> <b> <max_gap>` in the spec language - the other "next" item,
+timing rules that look across two different ids instead of just one id's own
+gaps.
+
+checks that every occurrence of `a` in the log gets answered by a `b` within
+`max_gap` seconds after it - the request/response shape. real motivating
+case is OBD-II: you send a `7DF` query, the ecu answers on `7E8`, and if that
+takes too long something's wrong.
+
+implementation's a plain nested scan - for each `a` timestamp, look for any
+`b` timestamp that's `>= a` and within the window. not fast (O(n*m)) but logs
+in this project are hand-typed and tiny, so it doesn't matter yet. an answer
+has to come *after* the request - an early `b` with no `a` before it doesn't
+count, which the tests check for specifically (staged a log with a `7E8`
+sitting before any `7DF` and made sure it still failed).
+
+`a` never showing up in the log passes vacuously, same call as `range` and
+`period`. added `id2` to `Rule` for the second id since present/absent/period
+only needed one.
+
+manually built a little obd request/response log to check it end to end - a
+fast reply passes, a slow second one (0.1s and 0.15s against a 0.05s window)
+correctly fails and names the offending timestamp. didn't add it to
+`toy.spec` since `drive.log` has no `7E8` frames and I want that file to stay
+"everything passes."
+
+76/76 through ctest.
+
 ## next
 
-- real bus-off recovery, or timing rules that look across different ids (not
-  just one id's own gaps)
+- real bus-off recovery
 - maybe let `corrupt_one_bit` pick a random bit instead of always the same
   spot, so stuff errors show up in the sim sometimes too

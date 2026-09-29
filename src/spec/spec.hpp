@@ -12,9 +12,12 @@
 //                                has to land inside [0.08, 0.12] seconds -
 //                                catches a node that's dropped off its
 //                                normal send rate, sending too fast/slow
+//   follows 7DF 7E8 0.05       - every 0x7DF has to be answered by a 0x7E8
+//                                within 0.05s - a request/response deadline,
+//                                the OBD-II query-then-answer shape
 //
-// ids are hex, no "0x". that's the whole language for now - no "signal X
-// implies signal Y", no rate-of-change checks.
+// ids are hex, no "0x". that's the whole language for now - no rate-of-change
+// checks, no "signal X implies signal Y".
 
 #ifndef CANBENCH_SPEC_HPP
 #define CANBENCH_SPEC_HPP
@@ -30,13 +33,14 @@
 
 namespace canbench {
 
-enum class RuleKind { kPresent, kAbsent, kRange, kPeriod };
+enum class RuleKind { kPresent, kAbsent, kRange, kPeriod, kFollows };
 
 struct Rule {
   RuleKind kind;
-  std::uint32_t id = 0;    // present/absent/period
+  std::uint32_t id = 0;    // present/absent/period/follows (the "before" id)
+  std::uint32_t id2 = 0;   // follows only - the id that has to answer `id`
   std::string signal;      // range
-  double lo = 0, hi = 0;   // range: value bounds. period: gap bounds, seconds
+  double lo = 0, hi = 0;   // range: value bounds. period/follows: gap bound(s), seconds
 };
 
 struct SpecFile {
