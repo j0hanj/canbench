@@ -54,12 +54,15 @@ struct FlipResult {
 
 std::vector<FlipResult> sweep_single_flips(const Frame& f);
 
-// flips one real bit of the frame - the last data bit, or the last control
-// bit if it carries no data - and decodes the result. this is what fault
-// injection in the bus sim actually does now: instead of just assuming an
-// error happened, it corrupts a specific bit and lets decode_wire say what a
-// receiver would catch. every frame has a control field, so this always has
-// somewhere to flip.
+// flips one bit of the frame, picked uniformly at random from everything
+// between SOF and the last EOF bit (the ack slot and interframe space are
+// excluded - they don't mean anything to decode_wire), and decodes the
+// result. this is what fault injection in the bus sim actually does now:
+// instead of assuming an error happened, it genuinely corrupts a random bit
+// and lets decode_wire say what a receiver would catch - so it's usually a
+// crc error (most of the frame is id/data, and almost any change there
+// breaks the crc) but sometimes, when the unlucky bit breaks a run of five,
+// a stuff error instead. same mix a real random corruption would produce.
 WireDecode corrupt_one_bit(const Frame& f);
 
 }  // namespace canbench

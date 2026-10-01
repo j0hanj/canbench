@@ -57,22 +57,27 @@ node's own frames still go out in the order it queued them - winning
 arbitration doesn't let a node cut in front of its earlier frames.
 
 it also does fault injection and error counters now: tag any frame with a
-trailing `!` and it actually gets one bit corrupted on the wire (via
-`corrupt_one_bit` in `src/frame/wire.cpp`) and run through a real receiver -
-whatever error that receiver catches (usually a crc error) is what shows up
-in the log, not just an assumed "something's wrong". the sender takes a
-transmit error (its TEC goes up by 8), everyone else still on the bus takes a
-receive error (REC up by 1). enough of those in a row and a node crosses into
-error-passive, then bus-off, at which point it stops sending and whatever's
-left in its queue never goes out - the same fault confinement rule that keeps
-one flaky module from jamming a real car's bus:
+trailing `!` and it actually gets one bit corrupted on the wire - a real
+random bit, picked fresh each time (via `corrupt_one_bit` in
+`src/frame/wire.cpp`) - and run through a real receiver. whatever error that
+receiver catches is what shows up in the log, not just an assumed "something's
+wrong". it's usually a crc error since most of the frame is id/data and almost
+any change there breaks the crc, but every so often the unlucky bit breaks a
+run of five and you get a stuff error instead - same mix a real random
+corruption would produce. the sender takes a transmit error (its TEC goes up
+by 8), everyone else still on the bus takes a receive error (REC up by 1).
+enough of those in a row and a node crosses into error-passive, then bus-off,
+at which point it stops sending and whatever's left in its queue never goes
+out - the same fault confinement rule that keeps one flaky module from
+jamming a real car's bus. output varies a bit run to run since the bit
+corrupted each time is random, but it reads like this:
 
 ```
 $ canbench sim ecu:100#DEADBEEF!,...(34 total)... abs:200#00,200#00,200#00
 bus order (35 frames sent):
    1  ecu    id=0x100 std data dlc=4 [DE AD BE EF]      tec=8    rec=0    active  [FAULT: crc error]
      ...
-  16  ecu    id=0x100 std data dlc=4 [DE AD BE EF]      tec=128  rec=0    PASSIVE  [FAULT: crc error]
+  16  ecu    id=0x100 std data dlc=4 [DE AD BE EF]      tec=128  rec=0    PASSIVE  [FAULT: stuff error]
      ...
   32  ecu    id=0x100 std data dlc=4 [DE AD BE EF]      tec=256  rec=0    BUS-OFF  [FAULT: crc error]
   33  abs    id=0x200 std data dlc=1 [00]               tec=0    rec=32   active

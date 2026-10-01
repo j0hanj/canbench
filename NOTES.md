@@ -397,8 +397,37 @@ correctly fails and names the offending timestamp. didn't add it to
 
 76/76 through ctest.
 
+## day 17
+
+`corrupt_one_bit` picks a random bit now instead of always the last data (or
+control) bit - the other half of yesterday's "next" item.
+
+first attempt was wrong and i caught it before committing: i had it *search*
+for a bit that would specifically cause a stuff error and prefer that, so a
+zero-heavy frame would show something other than crc error for once. tried it
+on a handful of frames and every single one came back "stuff error" - every
+one. turns out the crc is 15 pseudo-random-looking bits, and a run of 5
+identical bits shows up somewhere in almost any CAN frame once you include
+the crc, so there's basically always a stuff-error bit to find. "prefer
+stuff" doesn't give a realistic mix, it gives "always stuff" - just swapped
+one monotonous answer for a different monotonous answer.
+
+what i actually wanted: pick uniformly at random from every bit SOF..eof
+(skipping the ack slot and ifs, which decode_wire doesn't care about) and let
+whatever happens happen. ran `canbench sim ecu:123#DEADBEEF!` 25 times and
+tallied the fault kind: 21 crc, 3 form, 1 stuff - which is exactly the shape
+i'd expect, since id/data bits vastly outnumber the handful of fixed-form
+bits (sof, delimiters, eof) and crc mismatches are what nearly all of them
+turn into.
+
+tests had to change shape too - can't assert a specific caught error kind
+anymore since it's genuinely random call to call, but every single sample
+frame still has to come back as *some* error (ran each one 20x to make sure),
+and a 200-flip run of `123#DEADBEEF` has to turn up more than one distinct
+kind so a regression back to "always the same bit" would get caught. ran the
+whole suite 5 times in a row to make sure the randomness wasn't going to
+make something flaky - 76/76 every time.
+
 ## next
 
 - real bus-off recovery
-- maybe let `corrupt_one_bit` pick a random bit instead of always the same
-  spot, so stuff errors show up in the sim sometimes too

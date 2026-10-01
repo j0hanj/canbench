@@ -2,6 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <vector>
 
 using canbench::Bit;
@@ -131,13 +132,25 @@ TEST_CASE("truncated input is reported, not read past", "[wire]") {
   CHECK(decode_wire(no_ifs).error == WireError::kNone);
 }
 
-TEST_CASE("corrupt_one_bit always trips a real error", "[wire]") {
+TEST_CASE("corrupt_one_bit always trips a real error, whichever bit it picks", "[wire]") {
   // this is what the bus sim's '!' actually calls now - every frame in the
-  // spread (including the data-less remote ones) has to come back broken
-  for (const Frame& f : sample_frames()) CHECK(corrupt_one_bit(f).error != WireError::kNone);
+  // spread (including the data-less remote ones) has to come back broken, no
+  // matter which random bit got hit. run each one a bunch of times since the
+  // pick changes call to call.
+  for (const Frame& f : sample_frames())
+    for (int i = 0; i < 20; ++i) CHECK(corrupt_one_bit(f).error != WireError::kNone);
 }
 
-TEST_CASE("corrupt_one_bit on a data-less frame hits the control field", "[wire]") {
-  auto d = corrupt_one_bit(*parse_short("200#R"));
-  CHECK(d.error != WireError::kNone);
+TEST_CASE("corrupt_one_bit's picks land on more than one kind of error", "[wire]") {
+  // not pinning down a seed or an exact distribution - just making sure this
+  // doesn't quietly turn into "always picks bit 0" or some other non-random
+  // regression. 200 flips of a frame with plenty of bits to choose from
+  // should turn up at least two different outcomes.
+  auto f = *parse_short("123#DEADBEEF");
+  std::vector<WireError> seen;
+  for (int i = 0; i < 200; ++i) {
+    WireError e = corrupt_one_bit(f).error;
+    if (std::find(seen.begin(), seen.end(), e) == seen.end()) seen.push_back(e);
+  }
+  CHECK(seen.size() > 1);
 }
