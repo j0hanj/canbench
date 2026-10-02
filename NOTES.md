@@ -428,6 +428,44 @@ kind so a regression back to "always the same bit" would get caught. ran the
 whole suite 5 times in a row to make sure the randomness wasn't going to
 make something flaky - 76/76 every time.
 
+## day 18
+
+bus-off recovery - the last thing on the "next" list from a while back.
+
+the real rule: a bus-off node needs 128 occurrences of 11 consecutive
+recessive bits before it's allowed back on. this sim is round-based (whole
+frames, not individual bits with idle time between them), so there's no
+clean way to count "11 recessive bits in a row" - closest honest stand-in is
+counting 128 *other frames* going by while the node is off. documented that
+as exactly what it is, a simplification, right in bus.cpp's header comment
+and errors.hpp's.
+
+`recover()` in errors.hpp just zeroes both counters - one-liner, same
+pattern as the other note_* functions. `run_bus` tracks an `off_streak` per
+node, bumps it for every bus-off node on every transmission (even ones it
+didn't send - it's still "hearing" the bus), and calls `recover()` once a
+node hits 128. the node picks its queue back up next round like nothing
+happened, since classify() just recomputes off the now-zeroed counters.
+
+tried it: 34 faulty frames from one node, 128 clean ones from another sharing
+the bus. ecu goes off at frame 32 (as before), and right on schedule - frame
+160, which is 32 + 128 - it's back to active and sends its last 2 queued
+frames. exactly where the math says it should land.
+
+the honest gap: if there's no other traffic once a node goes off, it just
+never recovers in this sim, even though a real bus sitting idle would clear
+the recessive-bit sequence almost instantly. wrote a test for that case too
+so it's a documented limitation, not a silent one.
+
+tests: recovery actually happens (was off, then active again, finished all
+its queued frames), and the "nobody else around" case stays off for good.
+plus a focused `errors_test.cpp` case for `recover()` on its own. 79/79
+through ctest.
+
+that's everything from the original todo list plus every "next" item it grew
+along the way. don't have a clear next thing lined up - whatever's next
+probably starts from using this for something instead of adding to it.
+
 ## next
 
-- real bus-off recovery
+- (open - see day 18)

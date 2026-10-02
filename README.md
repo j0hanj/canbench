@@ -67,10 +67,13 @@ run of five and you get a stuff error instead - same mix a real random
 corruption would produce. the sender takes a transmit error (its TEC goes up
 by 8), everyone else still on the bus takes a receive error (REC up by 1).
 enough of those in a row and a node crosses into error-passive, then bus-off,
-at which point it stops sending and whatever's left in its queue never goes
-out - the same fault confinement rule that keeps one flaky module from
-jamming a real car's bus. output varies a bit run to run since the bit
-corrupted each time is random, but it reads like this:
+at which point it stops sending - the same fault confinement rule that keeps
+one flaky module from jamming a real car's bus. a bus-off node comes back
+once it's heard 128 other frames go by (the sim's stand-in for the real
+"128 occurrences of 11 recessive bits" rule) and picks its queue back up
+where it left off; if nobody else has anything left to send, it just stays
+off. output varies a bit run to run since the bit corrupted each time is
+random, but it reads like this:
 
 ```
 $ canbench sim ecu:100#DEADBEEF!,...(34 total)... abs:200#00,200#00,200#00
@@ -87,6 +90,10 @@ bus order (35 frames sent):
   ecu  sent 32/34  tec=256 rec=0  BUS-OFF  (2 never sent)
   abs  sent 3/3  tec=0 rec=32  active
 ```
+
+give abs 128 frames instead of 3 and ecu recovers partway through them -
+`sent 34/34, active` instead of stuck at 32 with 2 never sent. same sim,
+just enough bus activity for the 128-frame recovery window to close.
 `inject` is the bit-level version of fault injection. it takes a frame, builds
 its on-wire bits, flips one, and runs the result through a receiver
 (`src/frame/wire.cpp`) that un-stuffs it, walks the fields, and checks the crc -

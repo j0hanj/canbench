@@ -5,8 +5,10 @@
 // the result to see what breaks - not just an assumed "something's wrong".
 // the sender takes a transmit error, everyone else still on the bus takes a
 // receive error, and errors.hpp's rules push their counters around. a node
-// whose TEC goes past 255 goes bus-off and stops contending - its remaining
-// queued frames never go out.
+// whose TEC goes past 255 goes bus-off and stops contending - it comes back
+// once it's heard 128 other frames go by (run_bus's stand-in for the real
+// 128-occurrences-of-11-recessive-bits rule) and resumes its queue where it
+// left off. if nobody else has anything left to send, it just stays off.
 
 #ifndef CANBENCH_BUS_HPP
 #define CANBENCH_BUS_HPP

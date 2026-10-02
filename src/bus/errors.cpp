@@ -15,4 +15,6 @@ void note_tx_error(ErrorCounters& c) { c.tec += 8; }
 void note_rx_ok(ErrorCounters& c) { c.rec = std::max(0, c.rec - 1); }
 void note_rx_error(ErrorCounters& c) { c.rec += 1; }
 
+void recover(ErrorCounters& c) { c = ErrorCounters{}; }
+
 }  // namespace canbench

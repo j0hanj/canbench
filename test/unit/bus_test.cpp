@@ -122,3 +122,52 @@ TEST_CASE("a clean send has no wire error", "[bus]") {
   CHECK_FALSE(r.log[0].faulty);
   CHECK(r.log[0].wire_error == WireError::kNone);
 }
+
+TEST_CASE("a bus-off node recovers after 128 other frames go by", "[bus]") {
+  // ecu goes off on its 32nd fault, then has 2 clean frames left in queue.
+  // abs supplies exactly 128 frames of "other bus activity" - enough for
+  // ecu to recover and get its last 2 out.
+  std::vector<QueuedFrame> ecu_queue;
+  for (int i = 0; i < 32; ++i) ecu_queue.push_back(qf("100#DEADBEEF", true));
+  ecu_queue.push_back(qf("100#00"));
+  ecu_queue.push_back(qf("100#01"));
+
+  std::vector<QueuedFrame> abs_queue;
+  for (int i = 0; i < 128; ++i) abs_queue.push_back(qf("200#00"));
+
+  auto r = run_bus({node("ecu", ecu_queue), node("abs", abs_queue)});
+
+  const auto* ecu = &r.nodes[0];
+  CHECK(ecu->sent == 34);          // every frame it had queued got out eventually
+  CHECK(ecu->state == BusState::kActive);
+  CHECK(ecu->counters.tec < 128);  // back below passive, not still smarting from the 32 faults
+
+  // somewhere in the log it actually was bus-off, and somewhere after that
+  // it's back to active - recovery has to really happen, not just "ecu
+  // never really needed it"
+  bool was_off = false, active_after_off = false;
+  for (const auto& t : r.log) {
+    if (t.node != "ecu") continue;
+    if (t.state == BusState::kOff) was_off = true;
+    else if (was_off && t.state == BusState::kActive) active_after_off = true;
+  }
+  CHECK(was_off);
+  CHECK(active_after_off);
+}
+
+TEST_CASE("a bus-off node with nobody else to hear stays off", "[bus]") {
+  // same setup, but abs only has 10 frames - nowhere near the 128 ecu needs
+  std::vector<QueuedFrame> ecu_queue;
+  for (int i = 0; i < 32; ++i) ecu_queue.push_back(qf("100#DEADBEEF", true));
+  ecu_queue.push_back(qf("100#00"));
+
+  std::vector<QueuedFrame> abs_queue;
+  for (int i = 0; i < 10; ++i) abs_queue.push_back(qf("200#00"));
+
+  auto r = run_bus({node("ecu", ecu_queue), node("abs", abs_queue)});
+
+  const auto* ecu = &r.nodes[0];
+  CHECK(ecu->state == BusState::kOff);
+  CHECK(ecu->sent == 32);  // the last clean frame never got out
+  CHECK(ecu->sent < ecu->queued);
+}

@@ -8,8 +8,9 @@
 //                    we don't model the flag itself, just the state).
 //   bus-off        - tec > 255. the node stops transmitting, full stop.
 //                    a real node needs 128 occurrences of 11 recessive bits
-//                    in a row to come back online - we don't model recovery,
-//                    once you're off you're off for the rest of the sim.
+//                    in a row to come back online - bus.cpp approximates
+//                    that as 128 other frames going by on the bus (see its
+//                    header comment), then calls recover() below.
 //
 // this is the simplified version of ISO 11898-1's rules: real TEC/REC deltas
 // depend on which of several error types happened and there's a special
@@ -39,6 +40,11 @@ void note_tx_ok(ErrorCounters& c);     // it sent one cleanly
 void note_tx_error(ErrorCounters& c);  // its own frame came back bad
 void note_rx_ok(ErrorCounters& c);     // it heard someone else's good frame
 void note_rx_error(ErrorCounters& c);  // it heard a bad frame on the bus
+
+// bus-off recovery: both counters drop to zero and the node is error-active
+// again. real hardware does this on its own once the recessive-bit sequence
+// completes; here it's bus.cpp deciding when that's happened.
+void recover(ErrorCounters& c);
 
 }  // namespace canbench
 

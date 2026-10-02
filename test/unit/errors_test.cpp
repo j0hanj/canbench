@@ -9,6 +9,7 @@ using canbench::note_rx_error;
 using canbench::note_rx_ok;
 using canbench::note_tx_error;
 using canbench::note_tx_ok;
+using canbench::recover;
 
 TEST_CASE("fresh counters are error-active", "[errors]") {
   CHECK(classify({}) == BusState::kActive);
@@ -53,4 +54,13 @@ TEST_CASE("rec climbs on rx errors and settles on rx ok", "[errors]") {
   CHECK(c.rec == 5);
   note_rx_ok(c);
   CHECK(c.rec == 4);
+}
+
+TEST_CASE("recover zeroes both counters and clears bus-off", "[errors]") {
+  ErrorCounters c{300, 150};
+  REQUIRE(classify(c) == BusState::kOff);
+  recover(c);
+  CHECK(c.tec == 0);
+  CHECK(c.rec == 0);
+  CHECK(classify(c) == BusState::kActive);
 }
