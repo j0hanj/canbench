@@ -466,6 +466,14 @@ that's everything from the original todo list plus every "next" item it grew
 along the way. don't have a clear next thing lined up - whatever's next
 probably starts from using this for something instead of adding to it.
 
+## day 19
+
+`canbench ids <log>` - one line per id with its send count and median gap
+between sends. mostly for eyeballing a log before writing period rules.
+`summarize_ids()` lives in `src/log/summary.cpp`, four tests in
+`summary_test.cpp`. median instead of mean so one long pause doesn't skew the
+number. 83/83 through ctest.
+
 ## next
 
 - (open - see day 18)

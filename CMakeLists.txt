@@ -18,6 +18,7 @@ add_library(canbench_core STATIC
   src/log/log.cpp
   src/log/asc.cpp
   src/log/reader.cpp
+  src/log/summary.cpp
   src/dbc/dbc.cpp
   src/wave/wave.cpp
   src/bus/bus.cpp

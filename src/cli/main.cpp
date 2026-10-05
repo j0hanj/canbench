@@ -17,6 +17,7 @@
 #include "frame/frame.hpp"
 #include "frame/wire.hpp"
 #include "log/reader.hpp"
+#include "log/summary.hpp"
 #include "spec/spec.hpp"
 #include "wave/wave.hpp"
 
@@ -26,6 +27,7 @@ int usage(std::ostream& os) {
   os << "usage: canbench <cmd> [args]\n"
         "  decode <frame>   parse one frame like 123#DEADBEEF and print it\n"
         "  dump <file.log|file.asc>  list every frame (candump .log or vector .asc)\n"
+        "  ids <file.log|file.asc>   per-id send count and median gap\n"
         "  signals <file.log|.asc> <file.dbc>   decode named signals from a log\n"
         "  wave <frame>     draw one frame as an ascii square wave\n"
         "  arb <frame>...   sort frames into bus arbitration order\n"
@@ -295,6 +297,24 @@ int inject(std::string_view text, std::optional<std::size_t> bit) {
   return 0;
 }
 
+int ids(std::string_view path) {
+  auto log = canbench::read_any_log(std::string(path));
+  if (!log) {
+    std::cerr << "canbench: can't open '" << path << "'\n";
+    return 1;
+  }
+  std::cout << "id         count   median gap\n";
+  for (const auto& s : canbench::summarize_ids(*log)) {
+    char idbuf[16];
+    std::snprintf(idbuf, sizeof(idbuf), s.extended ? "0x%08X" : "0x%03X", s.id);
+    std::cout << "  " << idbuf << "  ";
+    std::printf("%5zu   ", s.count);
+    if (s.median_gap) std::printf("%.4fs\n", *s.median_gap);
+    else std::printf("-\n");
+  }
+  return 0;
+}
+
 int check(std::string_view log_path, std::string_view spec_path, std::string_view dbc_path) {
   auto log = canbench::read_any_log(std::string(log_path));
   if (!log) {
@@ -349,6 +369,13 @@ int main(int argc, char** argv) {
       return 2;
     }
     return decode(args[1]);
+  }
+  if (cmd == "ids") {
+    if (args.size() != 2) {
+      std::cerr << "canbench: ids wants one log file\n";
+      return 2;
+    }
+    return ids(args[1]);
   }
   if (cmd == "dump") {
     if (args.size() != 2) {
