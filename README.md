@@ -30,6 +30,7 @@ frame decode, reading a candump log, and pulling named signals out with a
 canbench decode 123#DEADBEEF
 canbench dump some.log
 canbench ids some.log
+canbench load some.log 500000
 canbench signals some.log some.dbc
 canbench wave 123#DEADBEEF
 canbench arb 200#R 100#00 7DF#0201
@@ -43,6 +44,10 @@ canbench inject 123#DEADBEEF 40
 `ids` gives one line per id in a log: how many times it went out and the
 median gap between sends - a quick way to see what a node's rate looks like
 before you write a `period` rule for it.
+`load` estimates bus load: every logged frame's real on-wire bit count (stuffing
+and all) divided by what the bus could carry in the same time at the bitrate
+(default 500 kbit/s). it's what the frames cost, not a measurement - gaps and
+error frames aren't in the log.
 `dump` reads a whole log and lists every frame with its time offset, bus, and
 bytes, plus a count of anything that didn't parse. it takes either a
 `candump -l` `.log` file or a Vector `.asc` (the CANoe/CANalyzer format) -

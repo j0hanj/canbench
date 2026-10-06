@@ -474,6 +474,24 @@ between sends. mostly for eyeballing a log before writing period rules.
 `summary_test.cpp`. median instead of mean so one long pause doesn't skew the
 number. 83/83 through ctest.
 
+## day 20
+
+`canbench load <log> [bitrate]` - estimated bus load. every frame's real wire
+cost comes from `bit_timeline()` (so stuff bits and the eof/ifs count), summed,
+then divided by the bits the bus could carry in the log's duration at the
+bitrate. default 500 kbit/s, which is the common car CAN speed, but you can pass
+125000 etc.
+
+the number is an underestimate on purpose-ish: it only counts the logged frames,
+not the idle gaps or error frames, so it's a floor, not a measurement. noted
+that in the header comment so future me doesn't read it as ground truth.
+
+checked by hand: drive.log is 780 bits over 0.1s, so 780 / (0.1 * 500000) =
+1.56%. at 125 kbit/s it's 6.24%, four times as much, which is right.
+
+tests in `load_test.cpp` - the math against bit_timeline lengths, no-time-span
+returns no percent, and empty log. 86/86 through ctest.
+
 ## next
 
 - (open - see day 18)

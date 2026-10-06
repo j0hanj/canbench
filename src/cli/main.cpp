@@ -17,6 +17,7 @@
 #include "frame/frame.hpp"
 #include "frame/wire.hpp"
 #include "log/reader.hpp"
+#include "log/load.hpp"
 #include "log/summary.hpp"
 #include "spec/spec.hpp"
 #include "wave/wave.hpp"
@@ -28,6 +29,7 @@ int usage(std::ostream& os) {
         "  decode <frame>   parse one frame like 123#DEADBEEF and print it\n"
         "  dump <file.log|file.asc>  list every frame (candump .log or vector .asc)\n"
         "  ids <file.log|file.asc>   per-id send count and median gap\n"
+        "  load <file.log|file.asc> [bitrate]   estimated bus load (default 500000)\n"
         "  signals <file.log|.asc> <file.dbc>   decode named signals from a log\n"
         "  wave <frame>     draw one frame as an ascii square wave\n"
         "  arb <frame>...   sort frames into bus arbitration order\n"
@@ -315,6 +317,20 @@ int ids(std::string_view path) {
   return 0;
 }
 
+int load(std::string_view path, double bitrate) {
+  auto log = canbench::read_any_log(std::string(path));
+  if (!log) {
+    std::cerr << "canbench: can't open '" << path << "'\n";
+    return 1;
+  }
+  auto l = canbench::bus_load(*log, bitrate);
+  std::printf("%zu frames, %.0f wire bits over %.4fs at %.0f bit/s\n", log->entries.size(),
+              l.frame_bits, l.seconds, bitrate);
+  if (l.percent) std::printf("estimated load %.2f%%\n", *l.percent);
+  else std::printf("estimated load - (log spans no time)\n");
+  return 0;
+}
+
 int check(std::string_view log_path, std::string_view spec_path, std::string_view dbc_path) {
   auto log = canbench::read_any_log(std::string(log_path));
   if (!log) {
@@ -369,6 +385,23 @@ int main(int argc, char** argv) {
       return 2;
     }
     return decode(args[1]);
+  }
+  if (cmd == "load") {
+    if (args.size() != 2 && args.size() != 3) {
+      std::cerr << "canbench: load wants a log file and optionally a bitrate\n";
+      return 2;
+    }
+    double bitrate = 500000.0;
+    if (args.size() == 3) {
+      std::string b(args[2]);
+      char* end = nullptr;
+      bitrate = std::strtod(b.c_str(), &end);
+      if (b.empty() || *end != '\0' || bitrate <= 0) {
+        std::cerr << "canbench: '" << b << "' isn't a bitrate\n";
+        return 2;
+      }
+    }
+    return load(args[1], bitrate);
   }
   if (cmd == "ids") {
     if (args.size() != 2) {

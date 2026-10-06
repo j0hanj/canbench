@@ -19,6 +19,7 @@ add_executable(canbench_tests
   unit/reader_test.cpp
   unit/wire_test.cpp
   unit/summary_test.cpp
+  unit/load_test.cpp
 )
 target_link_libraries(canbench_tests PRIVATE canbench_core Catch2::Catch2WithMain)
 
